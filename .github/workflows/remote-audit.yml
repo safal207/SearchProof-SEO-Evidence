@@ -1,0 +1,93 @@
+name: SearchProof Remote Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: Public http(s) URL to audit
+        required: true
+        type: string
+      mode:
+        description: Audit one page or crawl the site
+        required: true
+        default: page
+        type: choice
+        options:
+          - page
+          - site
+      max_pages:
+        description: Site mode only (1-200)
+        required: false
+        default: '50'
+        type: string
+      max_depth:
+        description: Site mode only (0-6)
+        required: false
+        default: '3'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: searchproof-remote-audit-${{ github.actor }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Validate public target
+        id: target
+        run: node src/remote-target.mjs "${{ inputs.target_url }}"
+
+      - name: Validate crawl limits
+        if: inputs.mode == 'site'
+        env:
+          MAX_PAGES: ${{ inputs.max_pages }}
+          MAX_DEPTH: ${{ inputs.max_depth }}
+        run: |
+          node - <<'NODE'
+          const pages = Number(process.env.MAX_PAGES);
+          const depth = Number(process.env.MAX_DEPTH);
+          if (!Number.isInteger(pages) || pages < 1 || pages > 200) throw new Error('max_pages must be an integer from 1 to 200');
+          if (!Number.isInteger(depth) || depth < 0 || depth > 6) throw new Error('max_depth must be an integer from 0 to 6');
+          NODE
+
+      - name: Run page audit
+        if: inputs.mode == 'page'
+        run: npm run audit -- "${{ steps.target.outputs.target }}"
+
+      - name: Run site crawl
+        if: inputs.mode == 'site'
+        run: npm run crawl -- "${{ steps.target.outputs.target }}" --max-pages=${{ inputs.max_pages }} --max-depth=${{ inputs.max_depth }}
+
+      - name: Build GitHub summary
+        if: always() && steps.target.outcome == 'success'
+        env:
+          SEARCHPROOF_MODE: ${{ inputs.mode }}
+          SEARCHPROOF_TARGET: ${{ steps.target.outputs.target }}
+        run: node scripts/github-summary.mjs
+
+      - name: Upload evidence bundle
+        if: always() && steps.target.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: searchproof-${{ inputs.mode }}-${{ github.run_id }}
+          path: |
+            reports/*.json
+            reports/github-summary.md
+          if-no-files-found: warn
+          retention-days: 14
