@@ -1,0 +1,105 @@
+name: SearchProof BatyaStore Final Market Case
+
+on:
+  push:
+    branches:
+      - audit/batyastore-final-market-case-2026-08-11
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout SearchProof
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Validate BatyaStore target
+        run: node src/remote-target.mjs "https://batyastore.ru/"
+
+      - name: Full diagnostic crawl sample
+        run: npm run crawl -- "https://batyastore.ru/" --max-pages=100 --max-depth=3
+
+      - name: Record accepted site evidence
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const file = fs.readdirSync('reports').filter((name) => /^batyastore\.ru-site-.*\.json$/.test(name)).sort().at(-1);
+          if (!file) throw new Error('BatyaStore report not found');
+          const report = JSON.parse(fs.readFileSync(`reports/${file}`, 'utf8'));
+          const accepted = {
+            generatedAt: report.audit.generatedAt,
+            summary: report.summary,
+            sitemapSources: report.sitemap.sources,
+            crawledMissingFromSitemap: report.sitemap.crawledMissingFromSitemap,
+            findings: report.findings.map(({ id, severity, evidence, affectedUrls }) => ({ id, severity, evidence, affectedUrls }))
+          };
+          fs.writeFileSync('reports/batyastore-accepted-evidence.json', JSON.stringify(accepted, null, 2));
+          console.log(JSON.stringify(accepted, null, 2));
+          NODE
+
+      - name: Probe controlled vertical-vacuums slice
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import { crawlSite } from './src/crawler.mjs';
+
+          const targets = [
+            ['category', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/'],
+            ['sort', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/?sort=NAME&order=asc'],
+            ['display', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/?display=list'],
+            ['pagination', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/?PAGEN_1=2'],
+            ['product-amica', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/vertikalnyy_pylesos_amica_joran_vm9001/'],
+            ['product-miele', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/pylesos_miele_soml0_triflex_hx2_pro_seryy_infiniti/'],
+            ['product-electrolux', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/besprovodnoy_pylesos_electrolux_clean_600_pure_es62cb25dh/']
+          ];
+
+          const evidence = [];
+          for (const [label, target] of targets) {
+            const report = await crawlSite({ startUrl: target, maxPages: 1, maxDepth: 0, timeoutMs: 15000 });
+            const page = report.pages[0] || {};
+            evidence.push({
+              label,
+              requested: target,
+              finalUrl: page.url || '',
+              status: page.status || 0,
+              title: page.title || '',
+              h1: page.h1s?.[0] || '',
+              canonical: page.canonical || '',
+              requestedInSitemap: report.sitemap.urls.includes(target),
+              canonicalInSitemap: report.sitemap.urls.includes(page.canonical || ''),
+              crawlTruncated: report.summary.crawlTruncated,
+              findings: report.findings.map((finding) => finding.id)
+            });
+          }
+          fs.writeFileSync('reports/batyastore-vertical-vacuums-evidence.json', JSON.stringify(evidence, null, 2));
+          console.log(JSON.stringify(evidence, null, 2));
+          NODE
+
+      - name: Build SearchProof summary
+        env:
+          SEARCHPROOF_MODE: site
+          SEARCHPROOF_TARGET: https://batyastore.ru/
+        run: node scripts/github-summary.mjs
+
+      - name: Upload final evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: searchproof-batyastore-final-${{ github.run_id }}
+          path: |
+            reports/*.json
+            reports/github-summary.md
+          if-no-files-found: error
+          retention-days: 14
