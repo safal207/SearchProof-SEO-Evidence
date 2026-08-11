@@ -1,0 +1,77 @@
+name: SearchProof Robys Final Clean Audit
+
+on:
+  push:
+    branches:
+      - audit/robys-final-clean-2026-08-11
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout SearchProof
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Validate live Robys target
+        run: node src/remote-target.mjs "https://safal207.github.io/robys-coffee-house-demo/"
+
+      - name: Crawl live Robys site
+        run: npm run crawl -- "https://safal207.github.io/robys-coffee-house-demo/" --max-pages=50 --max-depth=3
+
+      - name: Build SearchProof summary
+        env:
+          SEARCHPROOF_MODE: site
+          SEARCHPROOF_TARGET: https://safal207.github.io/robys-coffee-house-demo/
+        run: node scripts/github-summary.mjs
+
+      - name: Require zero technical findings
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const files = fs.readdirSync('reports')
+            .filter((name) => /^safal207\.github\.io-site-.*\.json$/.test(name))
+            .sort();
+          const file = files.at(-1);
+          if (!file) throw new Error('SearchProof crawl evidence report not found');
+          const report = JSON.parse(fs.readFileSync(`reports/${file}`, 'utf8'));
+          const expected = {
+            sitemapUrls: 3,
+            brokenInternalLinks: 0,
+            duplicateTitleGroups: 0,
+            canonicalMismatches: 0,
+            orphanLikeUrls: 0
+          };
+          for (const [key, value] of Object.entries(expected)) {
+            if (report.summary[key] !== value) throw new Error(`${key}: expected ${value}, got ${report.summary[key]}`);
+          }
+          if (report.findings.length !== 0) {
+            throw new Error(`Expected zero findings, got ${report.findings.length}: ${report.findings.map((item) => item.id).join(', ')}`);
+          }
+          console.log('Final clean crawl verified:', report.summary);
+          console.log('Descriptions:', report.pages.map((page) => [page.url, page.description]));
+          NODE
+
+      - name: Upload final evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: searchproof-robys-final-${{ github.run_id }}
+          path: |
+            reports/*.json
+            reports/github-summary.md
+          if-no-files-found: error
+          retention-days: 14
