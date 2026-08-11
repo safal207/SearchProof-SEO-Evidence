@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="SearchProof turns SEO, Yandex readiness and AEO/GEO findings into evidence-backed optimization experiments.">
   <meta name="robots" content="index,follow">
+  <meta name="theme-color" content="#0d1014">
   <title>SearchProof — SEO Evidence</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="experiment.css">
@@ -12,45 +13,53 @@
 <body>
   <header class="site-header">
     <a class="brand" href="#top" aria-label="SearchProof home"><span class="brand-mark">SP</span><span>SearchProof</span></a>
-    <a class="github-link" href="https://github.com/safal207/SearchProof-SEO-Evidence">GitHub ↗</a>
+    <div class="header-actions">
+      <div class="language-switch" role="group" aria-label="Language / Язык">
+        <button class="lang-button" type="button" data-lang="en" aria-pressed="true">EN</button>
+        <button class="lang-button" type="button" data-lang="ru" aria-pressed="false">RU</button>
+      </div>
+      <a class="github-link" href="https://github.com/safal207/SearchProof-SEO-Evidence" aria-label="SearchProof on GitHub">GitHub ↗</a>
+    </div>
   </header>
 
   <main id="top">
     <section class="hero">
       <p class="eyebrow">SEO · YANDEX · AEO · GEO</p>
-      <h1>SEO recommendations are cheap.<br><em>Evidence is the product.</em></h1>
-      <p class="hero-copy">SearchProof converts a page audit or site crawl into a chain you can verify: URL → finding → evidence → change → metric → observed result.</p>
-      <div class="audit-form" aria-label="Site crawl command preview">
-        <label for="url">Target site</label>
+      <h1 data-i18n-html="heroTitle">SEO recommendations are cheap.<br><em>Evidence is the product.</em></h1>
+      <p class="hero-copy" data-i18n="heroCopy">SearchProof converts a page audit or site crawl into a chain you can verify: URL → finding → evidence → change → metric → observed result.</p>
+      <div class="audit-form" aria-label="Site crawl command preview" data-i18n-aria-label="auditFormLabel">
+        <label for="url" data-i18n="targetSite">Target site</label>
         <div class="input-row">
-          <input id="url" type="url" value="https://safal207.github.io/robys-coffee-house-demo/" aria-describedby="url-help">
-          <button id="command-button" type="button">Copy site crawl command</button>
+          <input id="url" type="url" inputmode="url" value="https://safal207.github.io/robys-coffee-house-demo/" aria-describedby="url-help" autocomplete="url">
+          <button id="command-button" type="button" data-i18n="copyCrawl">Copy site crawl command</button>
         </div>
-        <p id="url-help">v0.3 combines bounded same-origin crawl evidence with a search experiment lifecycle. Use <code>npm run audit -- URL</code> for a detailed single-page report.</p>
-        <code id="command">npm run crawl -- https://safal207.github.io/robys-coffee-house-demo/ --max-pages=50 --max-depth=3</code>
+        <p id="url-help" data-i18n-html="urlHelp">v0.3.1 combines bounded same-origin crawl evidence with a search experiment lifecycle. Use <code>npm run audit -- URL</code> for a detailed single-page report.</p>
+        <code id="command" tabindex="0">npm run crawl -- https://safal207.github.io/robys-coffee-house-demo/ --max-pages=50 --max-depth=3</code>
       </div>
     </section>
 
     <section class="dashboard" aria-labelledby="dashboard-title">
       <div class="section-head">
-        <div><p class="eyebrow">DEMO PAGE REPORT</p><h2 id="dashboard-title">Evidence dashboard</h2></div>
-        <span class="truth-badge">Fixture data · no ranking claims</span>
+        <div><p class="eyebrow" data-i18n="demoReport">DEMO PAGE REPORT</p><h2 id="dashboard-title" data-i18n="evidenceDashboard">Evidence dashboard</h2></div>
+        <span class="truth-badge" data-i18n="fixtureNoClaims">Fixture data · no ranking claims</span>
       </div>
-      <div class="score-grid" id="scores" aria-label="Audit scores"></div>
+      <div class="score-grid" id="scores" aria-label="Audit scores" data-i18n-aria-label="auditScores"></div>
       <div class="two-column">
-        <section class="panel">
-          <div class="panel-head"><h3>Prioritized findings</h3><span id="finding-count"></span></div>
+        <section class="panel findings-panel">
+          <div class="panel-head"><h3 data-i18n="prioritizedFindings">Prioritized findings</h3><span id="finding-count"></span></div>
           <div id="findings" class="finding-list"></div>
         </section>
         <section class="panel">
-          <div class="panel-head"><h3>Hypothesis contract</h3></div>
-          <div class="flow" aria-label="Optimization evidence flow"><span>Finding</span><b>→</b><span>Evidence</span><b>→</b><span>Change</span><b>→</b><span>Metric</span><b>→</b><span>Verification</span></div>
+          <div class="panel-head"><h3 data-i18n="hypothesisContract">Hypothesis contract</h3></div>
+          <div class="flow" aria-label="Optimization evidence flow" data-i18n-aria-label="flowLabel">
+            <span data-i18n="finding">Finding</span><b>→</b><span data-i18n="evidence">Evidence</span><b>→</b><span data-i18n="change">Change</span><b>→</b><span data-i18n="metric">Metric</span><b>→</b><span data-i18n="verification">Verification</span>
+          </div>
           <dl class="contract">
-            <div><dt>Baseline</dt><dd>What is observed before the change?</dd></div>
-            <div><dt>Change</dt><dd>What exact implementation was made?</dd></div>
-            <div><dt>Metric</dt><dd>What should move if the hypothesis is useful?</dd></div>
-            <div><dt>Window</dt><dd>When is it reasonable to re-check?</dd></div>
-            <div><dt>Result</dt><dd>Observed value only — never invented uplift.</dd></div>
+            <div><dt data-i18n="baseline">Baseline</dt><dd data-i18n="baselineHelp">What is observed before the change?</dd></div>
+            <div><dt data-i18n="change">Change</dt><dd data-i18n="changeHelp">What exact implementation was made?</dd></div>
+            <div><dt data-i18n="metric">Metric</dt><dd data-i18n="metricHelp">What should move if the hypothesis is useful?</dd></div>
+            <div><dt data-i18n="window">Window</dt><dd data-i18n="windowHelp">When is it reasonable to re-check?</dd></div>
+            <div><dt data-i18n="result">Result</dt><dd data-i18n="resultHelp">Observed value only — never invented uplift.</dd></div>
           </dl>
         </section>
       </div>
@@ -58,40 +67,40 @@
 
     <section class="experiment-section" aria-labelledby="experiment-title">
       <div class="section-head">
-        <div><p class="eyebrow">EXPERIMENT BOARD · v0.3</p><h2 id="experiment-title">From SEO change to measured observation.</h2></div>
-        <span class="truth-badge">Observed delta ≠ causal attribution</span>
+        <div><p class="eyebrow">EXPERIMENT BOARD · v0.3</p><h2 id="experiment-title" data-i18n="experimentTitle">From SEO change to measured observation.</h2></div>
+        <span class="truth-badge" data-i18n="deltaNotCausal">Observed delta ≠ causal attribution</span>
       </div>
       <div id="experiment-board" class="experiment-board"></div>
       <div class="provider-panel">
-        <div><strong>Yandex Webmaster observation</strong><p>SearchProof can import TOTAL_SHOWS, TOTAL_CLICKS, AVG_SHOW_POSITION and AVG_CLICK_POSITION from the official Webmaster API and store them as provider evidence.</p></div>
-        <code>YANDEX_TOKEN=… YANDEX_USER_ID=… YANDEX_HOST_ID=… npm run yandex:observe -- --date-from=YYYY-MM-DD --date-to=YYYY-MM-DD</code>
+        <div><strong data-i18n="yandexObservation">Yandex Webmaster observation</strong><p data-i18n="yandexObservationCopy">SearchProof can import TOTAL_SHOWS, TOTAL_CLICKS, AVG_SHOW_POSITION and AVG_CLICK_POSITION from the official Webmaster API and store them as provider evidence.</p></div>
+        <code tabindex="0">YANDEX_TOKEN=… YANDEX_USER_ID=… YANDEX_HOST_ID=… npm run yandex:observe -- --date-from=YYYY-MM-DD --date-to=YYYY-MM-DD</code>
       </div>
     </section>
 
     <section class="principles">
       <p class="eyebrow">SITE CRAWL · v0.2</p>
-      <h2>From page checklist to search graph.</h2>
+      <h2 data-i18n="crawlTitle">From page checklist to search graph.</h2>
       <div class="principle-grid">
-        <article><strong>01</strong><h3>Internal-link graph</h3><p>Bounded same-origin BFS records exact page-to-page edges instead of only counting links on one document.</p></article>
-        <article><strong>02</strong><h3>Duplicate clusters</h3><p>Titles, H1s and descriptions are grouped across crawled pages so intent overlap becomes reviewable evidence.</p></article>
-        <article><strong>03</strong><h3>Sitemap vs crawl</h3><p>Sitemap-only URLs are flagged as orphan-like candidates, while crawled pages missing from the sitemap are kept separate.</p></article>
-        <article><strong>04</strong><h3>Observed failures only</h3><p>A link is called broken only when SearchProof actually fetched the internal target and observed a failing status.</p></article>
+        <article><strong>01</strong><h3 data-i18n="graphTitle">Internal-link graph</h3><p data-i18n="graphCopy">Bounded same-origin BFS records exact page-to-page edges instead of only counting links on one document.</p></article>
+        <article><strong>02</strong><h3 data-i18n="duplicatesTitle">Duplicate clusters</h3><p data-i18n="duplicatesCopy">Titles, H1s and descriptions are grouped across crawled pages so intent overlap becomes reviewable evidence.</p></article>
+        <article><strong>03</strong><h3 data-i18n="sitemapTitle">Sitemap vs crawl</h3><p data-i18n="sitemapCopy">Sitemap-only URLs are flagged as orphan-like candidates, while crawled pages missing from the sitemap are kept separate.</p></article>
+        <article><strong>04</strong><h3 data-i18n="failuresTitle">Observed failures only</h3><p data-i18n="failuresCopy">A link is called broken only when SearchProof actually fetched the internal target and observed a failing status.</p></article>
       </div>
     </section>
 
     <section class="principles">
-      <p class="eyebrow">PRODUCT RULES</p>
-      <h2>Built like a QA system for search.</h2>
+      <p class="eyebrow" data-i18n="productRules">PRODUCT RULES</p>
+      <h2 data-i18n="qaTitle">Built like a QA system for search.</h2>
       <div class="principle-grid">
-        <article><strong>01</strong><h3>Observed ≠ inferred</h3><p>HTML evidence, crawler responses and measured search data stay separate from recommendations.</p></article>
-        <article><strong>02</strong><h3>Scores are heuristics</h3><p>SearchProof never presents its prioritization score as a score from Yandex, Google or an AI provider.</p></article>
-        <article><strong>03</strong><h3>Every fix gets a metric</h3><p>A recommendation without a verification path is incomplete.</p></article>
-        <article><strong>04</strong><h3>AI Search without magic</h3><p>AEO/GEO checks focus on entities and answer structures, not guaranteed citations.</p></article>
+        <article><strong>01</strong><h3 data-i18n="observedTitle">Observed ≠ inferred</h3><p data-i18n="observedCopy">HTML evidence, crawler responses and measured search data stay separate from recommendations.</p></article>
+        <article><strong>02</strong><h3 data-i18n="scoresTitle">Scores are heuristics</h3><p data-i18n="scoresCopy">SearchProof never presents its prioritization score as a score from Yandex, Google or an AI provider.</p></article>
+        <article><strong>03</strong><h3 data-i18n="metricTitle">Every fix gets a metric</h3><p data-i18n="metricCopy">A recommendation without a verification path is incomplete.</p></article>
+        <article><strong>04</strong><h3 data-i18n="aiTitle">AI Search without magic</h3><p data-i18n="aiCopy">AEO/GEO checks focus on entities and answer structures, not guaranteed citations.</p></article>
       </div>
     </section>
   </main>
 
-  <footer><p>SearchProof v0.3 · Evidence-first technical SEO by <a href="https://github.com/safal207">Aleksey Safonov</a>.</p></footer>
+  <footer><p><span data-i18n="footerLead">SearchProof v0.3.1 · Evidence-first technical SEO by</span> <a href="https://github.com/safal207">Aleksey Safonov</a>.</p></footer>
   <script type="module" src="app.js"></script>
 </body>
 </html>
