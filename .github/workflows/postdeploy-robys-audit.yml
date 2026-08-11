@@ -1,0 +1,53 @@
+name: SearchProof Post-Deploy Robys Audit
+
+on:
+  push:
+    branches:
+      - audit/robys-postdeploy-2026-08-11
+    paths:
+      - .github/workflows/postdeploy-robys-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout SearchProof
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Validate live Robys target
+        id: target
+        run: node src/remote-target.mjs "https://safal207.github.io/robys-coffee-house-demo/"
+
+      - name: Crawl live Robys site
+        run: npm run crawl -- "${{ steps.target.outputs.target }}" --max-pages=50 --max-depth=3
+
+      - name: Build SearchProof summary
+        if: always() && steps.target.outcome == 'success'
+        env:
+          SEARCHPROOF_MODE: site
+          SEARCHPROOF_TARGET: ${{ steps.target.outputs.target }}
+        run: node scripts/github-summary.mjs
+
+      - name: Upload post-deploy evidence bundle
+        if: always() && steps.target.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: searchproof-robys-postdeploy-${{ github.run_id }}
+          path: |
+            reports/*.json
+            reports/github-summary.md
+          if-no-files-found: error
+          retention-days: 14
