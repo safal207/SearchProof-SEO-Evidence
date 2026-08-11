@@ -21,22 +21,22 @@
     <section class="hero">
       <p class="eyebrow">SEO · YANDEX · AEO · GEO</p>
       <h1>SEO recommendations are cheap.<br><em>Evidence is the product.</em></h1>
-      <p class="hero-copy">SearchProof converts a page audit into a chain you can verify: URL → finding → evidence → change → metric → observed result.</p>
-      <div class="audit-form" aria-label="Audit command preview">
-        <label for="url">Target URL</label>
+      <p class="hero-copy">SearchProof converts a page audit or site crawl into a chain you can verify: URL → finding → evidence → change → metric → observed result.</p>
+      <div class="audit-form" aria-label="Site crawl command preview">
+        <label for="url">Target site</label>
         <div class="input-row">
           <input id="url" type="url" value="https://safal207.github.io/robys-coffee-house-demo/" aria-describedby="url-help">
-          <button id="command-button" type="button">Copy audit command</button>
+          <button id="command-button" type="button">Copy site crawl command</button>
         </div>
-        <p id="url-help">MVP audits URLs from the Node CLI. The browser dashboard visualizes evidence reports without pretending that client-side CORS can crawl the web.</p>
-        <code id="command">npm run audit -- https://safal207.github.io/robys-coffee-house-demo/</code>
+        <p id="url-help">v0.2 crawls a bounded same-origin graph from Node. Use <code>npm run audit -- URL</code> for the detailed single-page SEO / AEO report.</p>
+        <code id="command">npm run crawl -- https://safal207.github.io/robys-coffee-house-demo/ --max-pages=50 --max-depth=3</code>
       </div>
     </section>
 
     <section class="dashboard" aria-labelledby="dashboard-title">
       <div class="section-head">
         <div>
-          <p class="eyebrow">DEMO REPORT</p>
+          <p class="eyebrow">DEMO PAGE REPORT</p>
           <h2 id="dashboard-title">Evidence dashboard</h2>
         </div>
         <span class="truth-badge">Fixture data · no ranking claims</span>
@@ -70,6 +70,17 @@
     </section>
 
     <section class="principles">
+      <p class="eyebrow">SITE CRAWL · v0.2</p>
+      <h2>From page checklist to search graph.</h2>
+      <div class="principle-grid">
+        <article><strong>01</strong><h3>Internal-link graph</h3><p>Bounded same-origin BFS records exact page-to-page edges instead of only counting links on one document.</p></article>
+        <article><strong>02</strong><h3>Duplicate clusters</h3><p>Titles, H1s and descriptions are grouped across crawled pages so intent overlap becomes reviewable evidence.</p></article>
+        <article><strong>03</strong><h3>Sitemap vs crawl</h3><p>Sitemap-only URLs are flagged as orphan-like candidates, while crawled pages missing from the sitemap are kept separate.</p></article>
+        <article><strong>04</strong><h3>Observed failures only</h3><p>A link is called broken only when SearchProof actually fetched the internal target and observed a failing status.</p></article>
+      </div>
+    </section>
+
+    <section class="principles">
       <p class="eyebrow">PRODUCT RULES</p>
       <h2>Built like a QA system for search.</h2>
       <div class="principle-grid">
@@ -82,7 +93,7 @@
   </main>
 
   <footer>
-    <p>SearchProof v0.1 · Evidence-first technical SEO by <a href="https://github.com/safal207">Aleksey Safonov</a>.</p>
+    <p>SearchProof v0.2 · Evidence-first technical SEO by <a href="https://github.com/safal207">Aleksey Safonov</a>.</p>
   </footer>
 
   <script type="module" src="app.js"></script>
