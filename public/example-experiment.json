@@ -1,0 +1,51 @@
+{
+  "meta": {
+    "kind": "fixture",
+    "note": "Demonstration data only. These values are not measured rankings, traffic or attributed uplift."
+  },
+  "experiment": {
+    "schemaVersion": "1.0",
+    "id": "demo-local-landing",
+    "title": "Local Russian landing intent",
+    "targetUrl": "https://safal207.github.io/robys-coffee-house-demo/ru/coffee-gazipasa.html",
+    "hypothesis": "A crawlable intent-specific Russian landing page may improve visibility for relevant local queries.",
+    "state": "measuring",
+    "createdAt": "2026-08-11T00:00:00.000Z",
+    "baseline": {
+      "source": "yandex-webmaster",
+      "capturedAt": "2026-08-01T00:00:00.000Z",
+      "metrics": {
+        "TOTAL_SHOWS": 100,
+        "TOTAL_CLICKS": 10,
+        "AVG_SHOW_POSITION": 12.5
+      }
+    },
+    "change": {
+      "description": "Add intent-specific crawlable landing, internal links and structured answer content.",
+      "appliedAt": "2026-08-11T00:00:00.000Z",
+      "evidenceUrl": "https://github.com/safal207/robys-coffee-house-demo/pull/327"
+    },
+    "verification": {
+      "metrics": ["TOTAL_SHOWS", "TOTAL_CLICKS", "AVG_SHOW_POSITION"],
+      "windowDays": 14,
+      "notes": "Re-check provider observations after the defined window."
+    },
+    "observations": [
+      {
+        "source": "yandex-webmaster",
+        "capturedAt": "2026-08-25T00:00:00.000Z",
+        "period": { "from": "2026-08-18", "to": "2026-08-24" },
+        "metrics": {
+          "TOTAL_SHOWS": 125,
+          "TOTAL_CLICKS": 12,
+          "AVG_SHOW_POSITION": 11.8
+        },
+        "note": "Fixture observation for UI demonstration only."
+      }
+    ],
+    "integrity": {
+      "causalClaim": false,
+      "note": "Observed movement is not presented as causal attribution."
+    }
+  }
+}
