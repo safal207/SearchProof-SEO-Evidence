@@ -6,40 +6,64 @@ Date: 2026-08-11
 
 This case is a public, read-only audit of a Russian e-commerce site. SearchProof did not change the target. The purpose is to separate observed technical evidence from SEO hypotheses and from future provider-side outcomes.
 
+## Evidence provenance
+
+Final full diagnostic run: `31470309293`
+
+Evidence artifact: `searchproof-batyastore-final-31470309293`
+
+Artifact ID: `9093126875`
+
+Artifact SHA-256: `b785bbdf32e39b1fcf5044c7c2258638b292bc06d3e1fc2f224cf593ca3e1b01`
+
+The artifact contains the full crawl report, accepted evidence summary, controlled Vertical Vacuums probe evidence and the generated SearchProof summary.
+
 ## Measurement integrity first
 
-BatyaStore exposed two limitations in SearchProof before the tool was allowed to judge the site:
+BatyaStore exposed three limitations in SearchProof before the tool was allowed to judge the site:
 
 1. the target uses a sitemap index; the original crawler treated child sitemap URLs as page URLs;
-2. a capped diagnostic crawl cannot honestly label all sitemap URLs outside its sample as orphan-like.
+2. a capped diagnostic crawl cannot honestly label all sitemap URLs outside its sample as orphan-like;
+3. a depth-limited one-page probe cannot support whole-site orphan inference either.
 
-Both measurement-layer problems were fixed with deterministic regression tests before client-facing conclusions were accepted.
+All three measurement-layer problems were handled with deterministic regression tests before client-facing conclusions were accepted.
 
 Relevant SearchProof changes:
 
 - PR #11 — recursive same-origin sitemap-index resolution;
-- PR #12 — partial-crawl sitemap coverage guard.
+- PR #12 — page-limit sitemap coverage guard;
+- PR #14 — depth-limit sitemap coverage guard.
 
 This is intentional: a finding is rejected when the measurement layer cannot support it.
 
 ## Corrected site baseline
 
-A sitemap-aware diagnostic crawl of 100 pages resolved the complete sitemap tree first.
+The final sitemap-aware diagnostic crawl sampled 100 pages after resolving the complete sitemap tree first.
 
 Observed:
 
 - 100 HTML pages in the crawl sample;
-- 42,940 internal-link edges;
+- 42,942 internal-link edges;
 - 36,310 page URLs across 7 sitemap documents;
 - 0 broken internal links among the crawled targets;
 - 0 duplicate title groups in the 100-page sample;
-- 0 canonical mismatches in the 100-page sample.
+- 0 canonical mismatches in the 100-page sample;
+- 0 accepted orphan-like URLs, because the 100-page crawl is explicitly partial.
 
-The crawl is intentionally capped, so absence of the remaining sitemap URLs from this crawl is **not** treated as proof of orphan pages.
+SearchProof records `sitemap-coverage-partial` rather than pretending the remaining sitemap URLs are orphans.
 
 ### Sitemap sources
 
-The resolved sitemap tree contains the root index plus six child URL sets, including large product/catalog sitemaps. This confirms that sitemap coverage must be evaluated against page URLs, not the child `.xml` documents.
+The resolved sitemap tree contains the root index plus six child URL sets:
+
+- `sitemap-files.xml` — 44 URLs;
+- `sitemap-iblock-6.xml` — 543 URLs;
+- `sitemap-iblock-10.xml` — 2 URLs;
+- `sitemap-iblock-11.xml` — 21,850 URLs;
+- `sitemap-iblock-11.part1.xml` — 13,737 URLs;
+- `sitemap-iblock-13.xml` — 134 URLs.
+
+This confirms that sitemap coverage must be evaluated against page URLs, not the child `.xml` documents.
 
 ## Accepted hypothesis 1 — sitemap product URLs that resolve to a category
 
@@ -47,7 +71,7 @@ A controlled slice was created around:
 
 `/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/`
 
-The sitemap contains 298 URLs in this category slice.
+The resolved sitemap contains 298 URLs in this category slice.
 
 Three representative product URLs from that slice were probed independently. In all three sampled cases, the requested product URL ended at the vertical-vacuums category page and exposed the category title, H1 and canonical instead of a distinct product document.
 
@@ -101,7 +125,7 @@ Does the current pagination/canonical strategy preserve reliable discovery and i
 
 ## Accepted hypothesis 3 — selective sitemap omission of utility pages
 
-Within the 100-page crawl, these self-canonical pages were discovered but absent from the resolved sitemap:
+Within the final 100-page crawl, these crawled pages were absent from the resolved sitemap:
 
 - `/help/delivery/`
 - `/help/payment/`
@@ -123,7 +147,7 @@ Therefore SearchProof does **not** label the mere existence of these parameters 
 
 **Baseline:** current category metadata, pagination/canonical behavior, sitemap membership, product URL state, and Yandex provider observations.
 
-**Priority change:** first remove/resolve stale sitemap product entries after quantifying the pattern; then evaluate pagination architecture as a separate change. Do not bundle both into one experiment.
+**Priority change:** first quantify and clean up stale/redirecting sitemap product entries; then evaluate pagination architecture as a separate change. Do not bundle both into one experiment.
 
 **Verification chain:**
 
