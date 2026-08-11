@@ -1,0 +1,303 @@
+name: BatyaStore Causal Graph Audit
+
+on:
+  push:
+    branches:
+      - audit/batyastore-full-audit-v2
+    paths:
+      - .github/workflows/batyastore-causal-graph.yml
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  causal-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout SearchProof
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fresh SearchProof crawl
+        continue-on-error: true
+        run: |
+          mkdir -p reports/batyastore-causal
+          npm run crawl -- "https://batyastore.ru/" --max-pages=200 --max-depth=4
+
+      - name: Build causal transition graph and quantify focused sitemap slice
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+
+          const ORIGIN = 'https://batyastore.ru';
+          const CATEGORY = '/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/';
+          const OUT = 'reports/batyastore-causal';
+          fs.mkdirSync(OUT, { recursive: true });
+
+          const observedAt = new Date().toISOString();
+          const timeoutMs = 18000;
+          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+          const norm = (u) => {
+            try {
+              const x = new URL(u, ORIGIN);
+              x.hash = '';
+              return x.toString();
+            } catch { return u; }
+          };
+          const sameUrl = (a,b) => norm(a).replace(/\/$/, '') === norm(b).replace(/\/$/, '');
+          const text = (html, re) => (html.match(re)?.[1] || '').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+          const attr = (html, re) => html.match(re)?.[1]?.trim() || '';
+          const sha = (s) => crypto.createHash('sha256').update(s || '').digest('hex');
+
+          async function get(url, options={}) {
+            const ac = new AbortController();
+            const tm = setTimeout(() => ac.abort(), timeoutMs);
+            try {
+              return await fetch(url, {
+                redirect: options.redirect || 'follow',
+                headers: {
+                  'user-agent': 'SearchProof-Evidence/0.3 causal-audit (+https://github.com/safal207/SearchProof-SEO-Evidence)',
+                  'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+                },
+                signal: ac.signal
+              });
+            } finally { clearTimeout(tm); }
+          }
+
+          async function fetchXml(url) {
+            const r = await get(url);
+            return { status:r.status, url:r.url, body:await r.text(), headers:Object.fromEntries(r.headers.entries()) };
+          }
+
+          async function resolveSitemaps(root) {
+            const queue=[root], seen=new Set(), pages=new Set(), docs=[];
+            while(queue.length && seen.size < 30) {
+              const u=queue.shift(); if(seen.has(u)) continue; seen.add(u);
+              try {
+                const {status,body}=await fetchXml(u);
+                docs.push({url:u,status,sha256:sha(body)});
+                if(status < 200 || status >= 400) continue;
+                const locs=[...body.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)].map(m=>m[1].trim());
+                const looksIndex=/<sitemapindex[\s>]/i.test(body);
+                if(looksIndex) {
+                  for(const loc of locs) {
+                    const x=new URL(loc,ORIGIN);
+                    if(x.origin===ORIGIN && /\.xml(?:$|\?)/i.test(x.pathname+x.search)) queue.push(x.toString());
+                  }
+                } else {
+                  for(const loc of locs) {
+                    const x=new URL(loc,ORIGIN);
+                    if(x.origin===ORIGIN) pages.add(x.toString());
+                  }
+                }
+              } catch(e) { docs.push({url:u,status:'error',error:String(e)}); }
+            }
+            return {docs,pages:[...pages]};
+          }
+
+          async function redirectTrace(url) {
+            const chain=[];
+            let current=url;
+            for(let i=0;i<6;i++) {
+              const ac=new AbortController(); const tm=setTimeout(()=>ac.abort(),timeoutMs);
+              try {
+                const r=await fetch(current,{redirect:'manual',headers:{'user-agent':'SearchProof-Evidence/0.3 causal-audit'},signal:ac.signal});
+                const location=r.headers.get('location');
+                chain.push({url:current,status:r.status,location:location?new URL(location,current).toString():null});
+                if(r.status>=300 && r.status<400 && location) { current=new URL(location,current).toString(); continue; }
+                const body=await r.text();
+                return {chain,finalUrl:current,status:r.status,body,headers:Object.fromEntries(r.headers.entries())};
+              } catch(e) {
+                chain.push({url:current,status:'error',error:String(e)});
+                return {chain,finalUrl:current,status:'error',body:'',headers:{}};
+              } finally { clearTimeout(tm); }
+            }
+            return {chain,finalUrl:current,status:'redirect-loop',body:'',headers:{}};
+          }
+
+          function htmlState(requested, result) {
+            const html=result.body || '';
+            const canonical=attr(html,/<link[^>]+rel=["'][^"']*canonical[^"']*["'][^>]+href=["']([^"']+)["']/i)
+              || attr(html,/<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*canonical[^"']*["']/i);
+            const title=text(html,/<title[^>]*>([\s\S]*?)<\/title>/i);
+            const h1=text(html,/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+            const categoryUrl=new URL(CATEGORY,ORIGIN).toString();
+            let classification='other';
+            if(result.status===404) classification='404';
+            else if(result.status===410) classification='410';
+            else if(result.status===200) {
+              if(sameUrl(result.finalUrl,categoryUrl)) classification = sameUrl(requested,result.finalUrl) ? 'category_200' : 'category_redirect';
+              else if(!sameUrl(requested,result.finalUrl)) classification='replacement_or_other_redirect';
+              else if(canonical && sameUrl(canonical,categoryUrl)) classification='product_200_canonical_to_category';
+              else if(canonical && !sameUrl(canonical,requested)) classification='product_200_canonical_elsewhere';
+              else classification='unique_200_candidate';
+            }
+            return {requested,status:result.status,finalUrl:result.finalUrl,canonical:canonical?norm(canonical):'',title,h1,classification,redirectChain:result.chain,htmlSha256:sha(html)};
+          }
+
+          const sitemap=await resolveSitemaps(`${ORIGIN}/sitemap.xml`);
+          const slice=sitemap.pages.filter(u=>new URL(u).pathname.startsWith(CATEGORY));
+
+          const results=new Array(slice.length);
+          let cursor=0;
+          async function worker(id) {
+            while(true) {
+              const i=cursor++; if(i>=slice.length) break;
+              const u=slice[i];
+              const r=await redirectTrace(u);
+              results[i]=htmlState(u,r);
+              if((i+1)%25===0) console.log(`classified ${i+1}/${slice.length}`);
+              await sleep(90);
+            }
+          }
+          await Promise.all(Array.from({length:6},(_,i)=>worker(i)));
+
+          const classCounts={};
+          for(const r of results.filter(Boolean)) classCounts[r.classification]=(classCounts[r.classification]||0)+1;
+
+          function pageLinks(html,base) {
+            const out=[];
+            for(const m of html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["']/gi)) {
+              try { const u=new URL(m[1],base); if(u.origin===ORIGIN) out.push(u.toString()); } catch {}
+            }
+            return [...new Set(out)];
+          }
+
+          const keyUrls=[
+            `${ORIGIN}/`,
+            `${ORIGIN}/contacts/`,
+            `${ORIGIN}/info/requisites/`,
+            `${ORIGIN}/info/faq/`,
+            `${ORIGIN}/info/`,
+            `${ORIGIN}/help/delivery/`,
+            `${ORIGIN}/help/payment/`,
+            `${ORIGIN}/help/warranty/`,
+            `${ORIGIN}${CATEGORY}`,
+            `${ORIGIN}${CATEGORY}?PAGEN_1=2`,
+            `${ORIGIN}${CATEGORY}?PAGEN_1=3`,
+            `${ORIGIN}${CATEGORY}?PAGEN_1=4`,
+            `${ORIGIN}${CATEGORY}?sort=NAME&order=asc`,
+            `${ORIGIN}${CATEGORY}?display=list`,
+            `${ORIGIN}/blog/`
+          ];
+
+          const surfaces=[];
+          for(const u of keyUrls) {
+            const r=await redirectTrace(u);
+            const st=htmlState(u,r);
+            const html=r.body || '';
+            const links=pageLinks(html,r.finalUrl);
+            const productLinks=links.filter(x=>new URL(x).pathname.startsWith(CATEGORY) && !sameUrl(x,`${ORIGIN}${CATEGORY}`));
+            const social=links.filter(x=>/t\.me|vk\.com|youtube\.com|youtu\.be|dzen\.ru|rutube\.ru/i.test(x));
+            const entities={
+              batyaStore:/БАТЯ\s*СТОР/i.test(html),
+              digitalDelivery:/ЦИФРОВАЯ\s+ДОСТАВКА/i.test(html),
+              hours10to19:/10[:.]?00[^<\n]{0,40}19[:.]?00/i.test(html),
+              hours09to21:/09[:.]?00[^<\n]{0,40}21[:.]?00/i.test(html),
+              roundTheClock:/круглосуточ/i.test(html),
+              bereshkovskaya:/Бережковск/i.test(html),
+              lokomotivny:/Локомотивн/i.test(html),
+              phone800:/800[^0-9]{0,4}222[^0-9]{0,4}26[^0-9]{0,4}92/i.test(html)
+            };
+            surfaces.push({...st,productLinksCount:productLinks.length,productLinks:productLinks.slice(0,80),socialLinks:social,entities,responseHeaders:{etag:r.headers?.etag||'',lastModified:r.headers?.['last-modified']||'',cacheControl:r.headers?.['cache-control']||''}});
+          }
+
+          const page1=surfaces.find(x=>sameUrl(x.requested,`${ORIGIN}${CATEGORY}`));
+          const pagination=surfaces.filter(x=>/PAGEN_1=/.test(x.requested));
+          const p1set=new Set(page1?.productLinks || []);
+          const paginationStats=pagination.map(p=>{
+            const links=p.productLinks||[];
+            const overlap=links.filter(x=>p1set.has(x)).length;
+            return {url:p.requested,status:p.status,canonical:p.canonical,productLinks:links.length,overlapWithPage1:overlap,newVsPage1:links.length-overlap};
+          });
+
+          const nodes=[]; const edges=[];
+          const nodeMap=new Map();
+          const addNode=(id,type,data={})=>{if(!nodeMap.has(id)){nodeMap.set(id,true);nodes.push({id,type,observedAt,...data});}};
+          const addEdge=(from,to,type,data={})=>edges.push({from,to,type,observedAt,...data});
+
+          for(const r of results.filter(Boolean)) {
+            addNode(r.requested,'sitemap_url',{classification:r.classification});
+            addNode(r.finalUrl,'final_url',{status:r.status,title:r.title,h1:r.h1});
+            addEdge('sitemap',r.requested,'declares');
+            addEdge(r.requested,r.finalUrl,'request_transition',{chain:r.redirectChain.map(x=>x.status)});
+            if(r.canonical){addNode(r.canonical,'canonical_target');addEdge(r.finalUrl,r.canonical,'canonicalizes_to');}
+          }
+          for(const p of surfaces) {
+            addNode(p.requested,'surface',{status:p.status,title:p.title,h1:p.h1,entities:p.entities});
+            if(p.canonical){addNode(p.canonical,'canonical_target');addEdge(p.requested,p.canonical,'canonicalizes_to');}
+            for(const l of p.productLinks.slice(0,80)){addNode(l,'linked_url');addEdge(p.requested,l,'links_to');}
+          }
+
+          const entityConflicts={
+            digitalDeliverySurfaces:surfaces.filter(x=>x.entities.digitalDelivery).map(x=>x.requested),
+            hours10to19Surfaces:surfaces.filter(x=>x.entities.hours10to19).map(x=>x.requested),
+            hours09to21Surfaces:surfaces.filter(x=>x.entities.hours09to21).map(x=>x.requested),
+            roundTheClockSurfaces:surfaces.filter(x=>x.entities.roundTheClock).map(x=>x.requested),
+            bereshkovskayaSurfaces:surfaces.filter(x=>x.entities.bereshkovskaya).map(x=>x.requested),
+            lokomotivnySurfaces:surfaces.filter(x=>x.entities.lokomotivny).map(x=>x.requested),
+            surfacesWithSocialLinks:surfaces.filter(x=>x.socialLinks.length).map(x=>({url:x.requested,links:x.socialLinks}))
+          };
+
+          const focus=[];
+          const affectedCategory=(classCounts.category_redirect||0)+(classCounts.product_200_canonical_to_category||0)+(classCounts.category_200||0);
+          focus.push({id:'product-sitemap-transition',reach:affectedCategory,confidence:slice.length?affectedCategory/slice.length:0,severity:5,score:affectedCategory*5,reason:'product-declared URLs transition/canonicalize to category'});
+          const paginationPage1Canonical=paginationStats.filter(x=>x.canonical && sameUrl(x.canonical,`${ORIGIN}${CATEGORY}`)).length;
+          focus.push({id:'pagination-canonical-collapse',reach:paginationPage1Canonical,confidence:paginationStats.length?paginationPage1Canonical/paginationStats.length:0,severity:3,score:paginationPage1Canonical*3,reason:'deeper pages canonicalize to page 1; verify discovery impact'});
+          const entityVariantCount=Object.values(entityConflicts).filter(Array.isArray).reduce((n,a)=>n+(a.length?1:0),0);
+          focus.push({id:'entity-surface-drift',reach:entityVariantCount,confidence:1,severity:2,score:entityVariantCount*2,reason:'multiple public surfaces expose variant entity/time/address signals'});
+          focus.sort((a,b)=>b.score-a.score);
+
+          const report={
+            target:ORIGIN,
+            observedAt,
+            model:'state → transition → cause hypothesis → downstream effect → verification',
+            sitemap:{documents:sitemap.docs,totalPageUrls:sitemap.pages.length,focusedSlice:CATEGORY,focusedSliceUrls:slice.length,classCounts},
+            focusedResults:results,
+            surfaces,
+            paginationStats,
+            entityConflicts,
+            graph:{nodes,edges},
+            focus,
+            integrity:[
+              'This run observes HTTP/HTML transitions; it does not prove ranking, traffic, conversion or revenue impact.',
+              'Focus score is a diagnostic prioritization heuristic, not a financial estimate.',
+              'Entity text matching is a surface-drift detector and requires semantic/manual confirmation.',
+              'Repeated scheduled snapshots are intended to reveal temporal state changes; one run is a point-in-time observation.'
+            ]
+          };
+          fs.writeFileSync(`${OUT}/batyastore-causal-graph.json`,JSON.stringify(report,null,2));
+
+          const counts=Object.entries(classCounts).sort((a,b)=>b[1]-a[1]);
+          const md=[];
+          md.push('# BatyaStore causal graph audit','',`- Observed: ${observedAt}`,`- Sitemap page URLs resolved: ${sitemap.pages.length}`,`- Focused vertical-vacuum slice: ${slice.length} URLs`,'');
+          md.push('## Focused sitemap transitions','', '| state | URLs |','|---|---:|', ...counts.map(([k,v])=>`| ${k} | ${v} |`),'');
+          md.push('## Pagination state transitions','', '| page | status | canonical | product links | new vs page 1 |','|---|---:|---|---:|---:|', ...paginationStats.map(x=>`| ${new URL(x.url).search || 'page1'} | ${x.status} | ${x.canonical || ''} | ${x.productLinks} | ${x.newVsPage1} |`),'');
+          md.push('## Entity/time surface drift','',`- legacy company-name matches: ${entityConflicts.digitalDeliverySurfaces.length}`,`- 10:00–19:00 matches: ${entityConflicts.hours10to19Surfaces.length}`,`- 09:00–21:00 matches: ${entityConflicts.hours09to21Surfaces.length}`,`- round-the-clock wording matches: ${entityConflicts.roundTheClockSurfaces.length}`,`- Bereshkovskaya matches: ${entityConflicts.bereshkovskayaSurfaces.length}`,`- Lokomotivny matches: ${entityConflicts.lokomotivnySurfaces.length}`,`- surfaces with explicit social links: ${entityConflicts.surfacesWithSocialLinks.length}`,'');
+          md.push('## Focus order','',...focus.map((x,i)=>`${i+1}. **${x.id}** — reach=${x.reach}, confidence=${x.confidence.toFixed(2)}, score=${x.score}. ${x.reason}`),'');
+          md.push('## Integrity','',...report.integrity.map(x=>`- ${x}`));
+          const summary=md.join('\n');
+          fs.writeFileSync(`${OUT}/summary.md`,summary);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,`${summary}\n`);
+          console.log(summary);
+          NODE
+
+      - name: Upload causal evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: batyastore-causal-graph-${{ github.run_id }}
+          path: |
+            reports/batyastore-causal/
+            reports/*.json
+          if-no-files-found: error
+          retention-days: 14
