@@ -16,7 +16,15 @@ Artifact ID: `9093126875`
 
 Artifact SHA-256: `b785bbdf32e39b1fcf5044c7c2258638b292bc06d3e1fc2f224cf593ca3e1b01`
 
-The artifact contains the full crawl report, accepted evidence summary, controlled Vertical Vacuums probe evidence and the generated SearchProof summary.
+Final controlled-target run: `31470734859`
+
+Targeted evidence artifact: `searchproof-batyastore-targeted-final-31470734859`
+
+Targeted artifact ID: `9093240047`
+
+Targeted artifact SHA-256: `db9eccb0ae303f2f48076a0471a6e506ffbb3fc7b8f7e2dfced395cec4551a7e`
+
+The evidence bundles preserve the full crawl report, accepted evidence summary and controlled Vertical Vacuums probes.
 
 ## Measurement integrity first
 
@@ -73,7 +81,7 @@ A controlled slice was created around:
 
 The resolved sitemap contains 298 URLs in this category slice.
 
-Three representative product URLs from that slice were probed independently. In all three sampled cases, the requested product URL ended at the vertical-vacuums category page and exposed the category title, H1 and canonical instead of a distinct product document.
+Three representative product URLs from that slice were probed independently with the final crawler. In all three sampled cases, the requested URL is present in the sitemap but the HTTP request ends at the vertical-vacuums category page and exposes the category title, H1 and canonical instead of a distinct product document.
 
 Sampled products:
 
@@ -107,9 +115,11 @@ Observed on the same category:
 - clean category URL returns HTTP 200 and self-canonical;
 - `?sort=NAME&order=asc` returns HTTP 200 and canonicals to the clean category;
 - `?display=list` returns HTTP 200 and canonicals to the clean category;
-- `?PAGEN_1=2` also returns HTTP 200 with the same title/H1/description and canonicals to page 1.
+- `?PAGEN_1=2` also returns HTTP 200 with the same title/H1 and canonicals to page 1.
 
 The sort/display containment may be intentional and useful. Pagination deserves a separate review because page 2 represents a different product slice while declaring page 1 as canonical.
+
+The targeted probe is deliberately depth-limited; SearchProof now records partial coverage instead of generating unsupported orphan findings from that probe.
 
 ### Experiment question
 
