@@ -1,0 +1,42 @@
+name: SearchProof BatyaStore Market Audit
+
+on:
+  push:
+    branches:
+      - audit/batyastore-market-case-2026-08-11
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout SearchProof
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate BatyaStore target
+        run: node src/remote-target.mjs "https://batyastore.ru/"
+      - name: Crawl BatyaStore
+        run: npm run crawl -- "https://batyastore.ru/" --max-pages=100 --max-depth=3
+      - name: Build SearchProof summary
+        env:
+          SEARCHPROOF_MODE: site
+          SEARCHPROOF_TARGET: https://batyastore.ru/
+        run: node scripts/github-summary.mjs
+      - name: Upload evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: searchproof-batyastore-${{ github.run_id }}
+          path: |
+            reports/*.json
+            reports/github-summary.md
+          if-no-files-found: error
+          retention-days: 14
