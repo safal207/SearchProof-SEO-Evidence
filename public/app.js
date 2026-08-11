@@ -24,7 +24,8 @@ const translations = {
     next: 'Next', verifyWith: 'Verify with', manualReview: 'manual review',
     target: 'Target', changeEvidence: 'Change evidence', implementationLink: 'PR / implementation ↗', verificationWindow: 'Verification window', days: 'days', provider: 'Provider', observed: 'Observed', delta: 'Delta', pending: 'pending',
     fixture: 'fixture', noAttribution: 'no attribution claim', integritySuffix: 'Observed movement remains separate from causal attribution.',
-    loadReportError: 'Could not load example report', loadExperimentError: 'Could not load experiment fixture'
+    loadReportError: 'Could not load example report', loadExperimentError: 'Could not load experiment fixture',
+    planned: 'planned', implemented: 'implemented', measuring: 'measuring', observedState: 'observed', closed: 'closed'
   },
   ru: {
     pageTitle: 'SearchProof — SEO-доказательства',
@@ -51,7 +52,8 @@ const translations = {
     next: 'Что делать', verifyWith: 'Проверить через', manualReview: 'ручную проверку',
     target: 'Целевая страница', changeEvidence: 'Доказательство изменения', implementationLink: 'PR / реализация ↗', verificationWindow: 'Окно проверки', days: 'дней', provider: 'Источник', observed: 'После', delta: 'Изменение', pending: 'ожидание',
     fixture: 'демо', noAttribution: 'без заявления о причинности', integritySuffix: 'Наблюдаемая динамика хранится отдельно от утверждений о причинности.',
-    loadReportError: 'Не удалось загрузить демонстрационный отчёт', loadExperimentError: 'Не удалось загрузить демонстрационный эксперимент'
+    loadReportError: 'Не удалось загрузить демонстрационный отчёт', loadExperimentError: 'Не удалось загрузить демонстрационный эксперимент',
+    planned: 'запланировано', implemented: 'внедрено', measuring: 'измерение', observedState: 'наблюдение', closed: 'закрыто'
   }
 };
 
@@ -61,6 +63,14 @@ const findingCopyRu = {
   'structured-data': { message: 'Страница содержит структурированные данные JSON-LD', metric: 'покрытие машиночитаемыми сущностями' },
   'title-length': { message: 'Длина Title требует редакторской проверки', recommendation: 'Проверьте ясность и риск обрезания. Длина Title — редакторская эвристика, а не правило ранжирования.', metric: 'вид сниппета / наблюдение CTR' },
   'answer-structure': { message: 'Структуру ответов можно сделать явнее', recommendation: 'Добавьте действительно полезные видимые ответы на повторяющиеся вопросы и синхронизируйте разметку с видимым контентом.', metric: 'извлечение ответа / наблюдение AI-цитирования' }
+};
+
+const experimentCopyRu = {
+  'demo-local-landing': {
+    title: 'Локальный русскоязычный поисковый интент',
+    hypothesis: 'Отдельная индексируемая русскоязычная landing page под конкретный интент может улучшить видимость по релевантным локальным запросам.',
+    metaNote: 'Только демонстрационные данные. Эти значения не являются измеренными позициями, трафиком или доказанным ростом.'
+  }
 };
 
 const severityOrder = { error: 0, warn: 1, info: 2, pass: 3 };
@@ -144,6 +154,7 @@ function formatMetric(value) {
 function renderExperiment(payload) {
   const root = document.querySelector('#experiment-board');
   const experiment = payload.experiment;
+  const ruCopy = currentLang === 'ru' ? experimentCopyRu[experiment.id] : null;
   const latest = experiment.observations?.at(-1) || null;
   const rows = experiment.verification.metrics.map((metric) => {
     const baseline = experiment.baseline?.metrics?.[metric];
@@ -159,10 +170,12 @@ function renderExperiment(payload) {
   }).join('');
 
   const fixtureLabel = currentLang === 'ru' && payload.meta.kind === 'fixture' ? t('fixture') : payload.meta.kind;
+  const stateKey = experiment.state === 'observed' ? 'observedState' : experiment.state;
+  const metaNote = ruCopy?.metaNote || payload.meta.note;
   root.innerHTML = `
     <article class="experiment-card">
-      <div class="experiment-head"><div><span class="state">${experiment.state}</span><h3>${experiment.title}</h3></div><span class="truth-badge">${fixtureLabel} · ${t('noAttribution')}</span></div>
-      <p class="hypothesis">${experiment.hypothesis}</p>
+      <div class="experiment-head"><div><span class="state">${t(stateKey)}</span><h3>${ruCopy?.title || experiment.title}</h3></div><span class="truth-badge">${fixtureLabel} · ${t('noAttribution')}</span></div>
+      <p class="hypothesis">${ruCopy?.hypothesis || experiment.hypothesis}</p>
       <div class="experiment-grid">
         <div><small>${t('target')}</small><code title="${experiment.targetUrl}">${experiment.targetUrl}</code></div>
         <div><small>${t('changeEvidence')}</small><a href="${experiment.change.evidenceUrl}">${t('implementationLink')}</a></div>
@@ -170,7 +183,7 @@ function renderExperiment(payload) {
         <div><small>${t('provider')}</small><strong>${experiment.baseline.source}</strong></div>
       </div>
       <div class="metric-table" role="table" aria-label="${t('verification')}">${rows}</div>
-      <p class="integrity-note">${payload.meta.note} ${t('integritySuffix')}</p>
+      <p class="integrity-note">${metaNote} ${t('integritySuffix')}</p>
     </article>`;
 }
 
