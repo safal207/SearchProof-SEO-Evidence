@@ -1,0 +1,46 @@
+.github-audit-row {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.github-audit-row span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.github-run-button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.github-run-button:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.github-run-button:focus-visible {
+  outline: 3px solid var(--info);
+  outline-offset: 3px;
+}
+
+@media (max-width: 620px) {
+  .github-audit-row {
+    align-items: stretch;
+  }
+
+  .github-run-button {
+    width: 100%;
+    text-align: center;
+  }
+}

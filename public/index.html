@@ -9,6 +9,7 @@
   <title>SearchProof — SEO Evidence</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="experiment.css">
+  <link rel="stylesheet" href="remote-audit.css">
 </head>
 <body>
   <header class="site-header">
@@ -33,8 +34,12 @@
           <input id="url" type="url" inputmode="url" value="https://safal207.github.io/robys-coffee-house-demo/" aria-describedby="url-help" autocomplete="url">
           <button id="command-button" type="button" data-i18n="copyCrawl">Copy site crawl command</button>
         </div>
-        <p id="url-help" data-i18n-html="urlHelp">v0.3.1 combines bounded same-origin crawl evidence with a search experiment lifecycle. Use <code>npm run audit -- URL</code> for a detailed single-page report.</p>
+        <p id="url-help" data-i18n-html="urlHelp">v0.3.2 combines bounded same-origin crawl evidence with a search experiment lifecycle. Use <code>npm run audit -- URL</code> for a detailed single-page report.</p>
         <code id="command" tabindex="0">npm run crawl -- https://safal207.github.io/robys-coffee-house-demo/ --max-pages=50 --max-depth=3</code>
+        <div class="github-audit-row">
+          <a class="github-run-button" href="https://github.com/safal207/SearchProof-SEO-Evidence/actions/workflows/remote-audit.yml">Run on GitHub / Запустить в GitHub ↗</a>
+          <span>No local setup · без локальной установки</span>
+        </div>
       </div>
     </section>
 
