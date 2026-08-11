@@ -109,6 +109,23 @@ async function safeFetch(fetchImpl, url, headers, timeoutMs) {
   }
 }
 
+async function discoverSitemap({ seed, origin, fetchImpl, headers, timeoutMs }) {
+  const scoped = normalizeUrl('sitemap.xml', seed);
+  const root = `${origin}/sitemap.xml`;
+  const candidates = [...new Set([scoped, root].filter(Boolean))];
+  let best = { url: candidates[0] || root, status: 0, urls: [] };
+
+  for (const url of candidates) {
+    const response = await safeFetch(fetchImpl, url, headers, timeoutMs);
+    const ok = response.status >= 200 && response.status < 400;
+    const urls = ok ? parseSitemap(response.body, origin) : [];
+    if (ok && urls.length) return { url, status: response.status, urls };
+    if (best.status === 0 || ok) best = { url, status: response.status, urls };
+  }
+
+  return best;
+}
+
 export async function crawlSite({
   startUrl,
   fetchImpl = fetch,
@@ -122,11 +139,9 @@ export async function crawlSite({
   const origin = new URL(seed).origin;
   const headers = { 'user-agent': userAgent, accept: 'text/html,application/xhtml+xml,application/xml,text/xml;q=0.9,*/*;q=0.1' };
 
-  const sitemapUrl = `${origin}/sitemap.xml`;
-  const sitemapResponse = await safeFetch(fetchImpl, sitemapUrl, headers, timeoutMs);
-  const sitemapUrls = sitemapResponse.status >= 200 && sitemapResponse.status < 400
-    ? parseSitemap(sitemapResponse.body, origin)
-    : [];
+  const sitemap = await discoverSitemap({ seed, origin, fetchImpl, headers, timeoutMs });
+  const sitemapUrl = sitemap.url;
+  const sitemapUrls = sitemap.urls;
 
   const queue = [{ url: seed, depth: 0 }];
   const queued = new Set([seed]);
@@ -225,7 +240,7 @@ export async function crawlSite({
       canonicalMismatches: canonicalMismatches.length,
       orphanLikeUrls: orphanLike.length
     },
-    sitemap: { url: sitemapUrl, status: sitemapResponse.status, urls: sitemapUrls, orphanLike, crawledMissingFromSitemap },
+    sitemap: { url: sitemapUrl, status: sitemap.status, urls: sitemapUrls, orphanLike, crawledMissingFromSitemap },
     pages,
     graph: { nodes: pages.map((page) => ({ url: page.url, status: page.status, depth: page.depth, title: page.title })), edges: uniqueEdges },
     duplicates: { titles: duplicateTitles, descriptions: duplicateDescriptions, h1s: duplicateH1s },
