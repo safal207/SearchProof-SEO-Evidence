@@ -123,6 +123,7 @@ jobs:
 
           fs.writeFileSync('reports/lighthouse/summary.md', summary);
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
+          console.log(summary);
           NODE
 
       - name: Upload Lighthouse evidence
