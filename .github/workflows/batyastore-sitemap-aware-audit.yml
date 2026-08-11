@@ -1,0 +1,61 @@
+name: SearchProof BatyaStore Sitemap-Aware Audit
+
+on:
+  push:
+    branches:
+      - audit/batyastore-sitemap-aware-2026-08-11
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout SearchProof
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Validate BatyaStore target
+        run: node src/remote-target.mjs "https://batyastore.ru/"
+
+      - name: Crawl BatyaStore
+        run: npm run crawl -- "https://batyastore.ru/" --max-pages=100 --max-depth=3
+
+      - name: Build SearchProof summary
+        env:
+          SEARCHPROOF_MODE: site
+          SEARCHPROOF_TARGET: https://batyastore.ru/
+        run: node scripts/github-summary.mjs
+
+      - name: Print measurement provenance
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const file = fs.readdirSync('reports').filter((name) => /^batyastore\.ru-site-.*\.json$/.test(name)).sort().at(-1);
+          if (!file) throw new Error('BatyaStore evidence report not found');
+          const report = JSON.parse(fs.readFileSync(`reports/${file}`, 'utf8'));
+          console.log('Summary:', report.summary);
+          console.log('Sitemap sources:', report.sitemap.sources);
+          console.log('Findings:', report.findings.map(({ id, severity, evidence, affectedUrls }) => ({ id, severity, evidence, affected: affectedUrls.length })));
+          NODE
+
+      - name: Upload evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: searchproof-batyastore-sitemap-aware-${{ github.run_id }}
+          path: |
+            reports/*.json
+            reports/github-summary.md
+          if-no-files-found: error
+          retention-days: 14
