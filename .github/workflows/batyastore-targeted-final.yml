@@ -1,0 +1,71 @@
+name: SearchProof BatyaStore Targeted Final
+
+on:
+  push:
+    branches:
+      - audit/batyastore-targeted-final-2026-08-11
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout SearchProof
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Probe controlled BatyaStore URLs
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import { crawlSite } from './src/crawler.mjs';
+          const targets = [
+            ['category', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/'],
+            ['sort', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/?sort=NAME&order=asc'],
+            ['display', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/?display=list'],
+            ['pagination', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/?PAGEN_1=2'],
+            ['product-amica', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/vertikalnyy_pylesos_amica_joran_vm9001/'],
+            ['product-miele', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/pylesos_miele_soml0_triflex_hx2_pro_seryy_infiniti/'],
+            ['product-electrolux', 'https://batyastore.ru/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/besprovodnoy_pylesos_electrolux_clean_600_pure_es62cb25dh/']
+          ];
+          const evidence = [];
+          for (const [label, target] of targets) {
+            const report = await crawlSite({ startUrl: target, maxPages: 1, maxDepth: 0, timeoutMs: 15000 });
+            const page = report.pages[0] || {};
+            evidence.push({
+              label,
+              requested: target,
+              finalUrl: page.url || '',
+              status: page.status || 0,
+              title: page.title || '',
+              h1: page.h1s?.[0] || '',
+              canonical: page.canonical || '',
+              requestedInSitemap: report.sitemap.urls.includes(target),
+              canonicalInSitemap: report.sitemap.urls.includes(page.canonical || ''),
+              crawlCoveragePartial: report.summary.crawlCoveragePartial,
+              findings: report.findings.map((finding) => finding.id)
+            });
+          }
+          fs.mkdirSync('reports', { recursive: true });
+          fs.writeFileSync('reports/batyastore-targeted-final.json', JSON.stringify(evidence, null, 2));
+          console.log(JSON.stringify(evidence, null, 2));
+          if (evidence.some((item) => item.findings.includes('sitemap-orphan-like'))) {
+            throw new Error('Depth-limited probe emitted unsupported sitemap-orphan-like finding');
+          }
+          NODE
+      - name: Upload targeted evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: searchproof-batyastore-targeted-final-${{ github.run_id }}
+          path: reports/batyastore-targeted-final.json
+          if-no-files-found: error
+          retention-days: 14
