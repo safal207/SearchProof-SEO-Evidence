@@ -59,7 +59,7 @@ const button = document.querySelector('#command-button');
 function updateCommand() {
   let value = urlInput.value.trim();
   try { value = new URL(value).href; } catch {}
-  command.textContent = `npm run audit -- ${value}`;
+  command.textContent = `npm run crawl -- ${value} --max-pages=50 --max-depth=3`;
 }
 
 urlInput.addEventListener('input', updateCommand);
