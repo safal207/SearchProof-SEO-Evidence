@@ -1,61 +1,59 @@
-# BatyaStore — Causal Graph / Temporal SEO Audit v3
+# BatyaStore — Causal Graph / Temporal SEO Audit v3.1
 
 Target: `https://batyastore.ru/`
 
 Date: 2026-08-11
 
-This report extends the earlier evidence-first audit from static findings into a state-transition model:
+This case extends a static SEO audit into a state-transition audit:
 
-`state(t) → transition → resulting state → cross-field conflict → cause hypothesis → bounded change → time/provider verification`
+`state(t) → transition → resulting state → field conflict → cause hypothesis → bounded change → time/provider verification`
 
-The goal is not to manufacture more SEO findings. The goal is to identify the smallest upstream state inconsistency that can explain many downstream symptoms.
+The objective is not to maximize the number of findings. It is to locate the smallest upstream inconsistency that can explain many downstream symptoms.
 
 ---
 
-## 1. State-vector model
+## 1. Audit model: a URL is a state vector
 
-For this case, one URL/entity is treated as a state vector rather than a single page:
+For this case SearchProof models a URL/entity as:
 
-`S(t) = { sitemap membership, HTTP/redirect state, final URL, canonical, internal-link reachability, taxonomy position, product identity, content identity, observed time }`
+`S(t) = { sitemap membership, HTTP state, final URL, canonical, internal-link reachability, taxonomy, product identity, content identity, observed time }`
 
-SearchProof records transitions between those states:
+Observed edges include:
 
 - `sitemap --declares--> URL`;
-- `URL --HTTP transition--> final URL`;
+- `URL --redirects/transitions_to--> final URL`;
 - `final URL --canonicalizes_to--> preferred URL`;
-- `category --links_to--> product`;
+- `category --exposes_product--> product URL`;
 - `state(t1) --changes_to--> state(t2)`.
 
-A high-value audit target is a **field conflict**: several signals describe the same entity differently.
+The highest-value pattern is a **field conflict**: different system signals describe the same entity differently.
 
-Example:
+The strongest BatyaStore example is:
 
-`sitemap: product is current`
+`sitemap field: “this product URL is current”`
 
-`HTTP: product URL redirects to ancestor category`
+`HTTP field: “this URL transitions to an ancestor category”`
 
-`internal graph: redirecting URL is not referenced in the bounded crawl`
+`sampled internal graph: “this redirecting URL is not referenced here”`
 
-`time: some such product URLs were newly emitted into the sitemap during the audit window`
+`time field: “some non-terminal product URLs were newly emitted into the sitemap during this audit”`
 
-That pattern is more informative than the generic label “redirect problem”.
+That is more informative than the generic label “redirect issue”.
 
 ---
 
-## 2. Fresh repository evidence
+## 2. Reproducible evidence
 
-### Causal graph run v1
+### Causal graph v1 — discovery run
 
-Workflow: `BatyaStore Causal Graph Audit`
-
-- run: `31480469700`;
+- workflow run: `31480469700`;
 - job: `93743998912`;
 - result: success;
 - artifact: `batyastore-causal-graph-31480469700`;
 - artifact ID: `9097081374`;
-- artifact SHA-256: `3507bcc97510dadf5ae1be479eb682a804552d44ad8539639493979c98bf265f`.
+- SHA-256: `3507bcc97510dadf5ae1be479eb682a804552d44ad8539639493979c98bf265f`.
 
-Fresh SearchProof crawl inside this run:
+Its fresh bounded crawl recorded:
 
 - 200 HTML pages;
 - 86,684 internal-link edges;
@@ -63,94 +61,102 @@ Fresh SearchProof crawl inside this run:
 - 0 broken internal links in the bounded crawl;
 - 0 duplicate-title groups in the ordinary 200-page crawl;
 - 0 canonical mismatches in that ordinary bounded crawl;
-- sitemap coverage explicitly marked partial.
+- partial sitemap coverage explicitly recorded.
 
-The ordinary crawl alone did **not** reveal the product-state pattern below. It became visible after focusing the graph on one commercial taxonomy slice and following state transitions.
+The v1 focus classifier undercounted nested ancestor-category redirects. Its raw evidence was retained, but the workflow itself was retired after the corrected v2 passed.
+
+### Causal graph v2 — corrected transition classifier
+
+- workflow: `BatyaStore Causal Graph Audit v2`;
+- run: `31481511256`;
+- job: `93747282308`;
+- result: success;
+- artifact: `batyastore-causal-v2-31481511256`;
+- artifact ID: `9097400615`;
+- SHA-256: `eb4b0a9c02bbbded25c2694cf6d5c5dd3b1e4d772dbc044167e9e68165de989e`.
 
 ### Temporal / identity run
 
-Workflow: `BatyaStore Temporal + Identity Audit`
-
+- workflow: `BatyaStore Temporal + Identity Audit`;
 - run: `31481008168`;
 - job: `93745689884`;
 - result: success;
 - artifact: `batyastore-temporal-identity-31481008168`;
 - artifact ID: `9097199170`;
-- artifact SHA-256: `48689227c07bc01f7e94b1f8eccb9c1bd6c716a006ae0d651fa626b5e4047c72`.
+- SHA-256: `48689227c07bc01f7e94b1f8eccb9c1bd6c716a006ae0d651fa626b5e4047c72`.
 
 ---
 
-## 3. P0 — product-state synchronization: 103 sitemap URLs transition to ancestor categories
+## 3. P0 — product-state synchronization
 
 Focused taxonomy prefix:
 
 `/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/`
 
-There are 298 sitemap URLs under this prefix, including the category itself.
+Current sitemap prefix size: **298 URLs**, including the category itself.
 
-Full transition classification from the causal artifact:
+Corrected v2 state distribution:
 
-- 194 `unique_200_candidate`;
-- 93 product-like URLs redirect to the main vertical-vacuums category;
-- 10 product-like URLs redirect to the nested `vertikalnye-moyushchie-pylesosy` category;
-- 1 URL is the category itself;
-- 0 observed 404s in this slice;
-- 0 observed 410s in this slice.
+| State | URLs |
+|---|---:|
+| `unique_200_candidate` | 194 |
+| `ancestor_category_redirect` | **103** |
+| `category_200` | 1 |
 
-Therefore, **103 of the 298 URLs in this category-prefix sitemap slice currently transition to an ancestor category rather than remain a terminal product document**.
+No 404 or 410 state was observed in this focused slice.
 
-All 103 observed redirect chains use the same status pattern:
+### 103 URLs share one transition family
 
-`declared URL → 302 → ancestor category → 200`
+All 103 ancestor-category transitions follow:
 
-Destination distribution:
+`declared sitemap URL → 302 → ancestor category → 200`
 
-- 93 → `/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/`;
-- 10 → `/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/vertikalnye-moyushchie-pylesosy/`.
+Destinations:
 
-### Important boundary
+- 93 → main vertical-vacuums category;
+- 10 → nested `vertikalnye-moyushchie-pylesosy` category.
 
-This is **not** “34.6% of the whole site is broken”. It is a state distribution inside one deliberately focused sitemap prefix.
+This is **not** a claim that 34.6% of the whole site/catalog is broken. It is the current distribution inside one deliberately focused sitemap prefix.
 
-### Cross-field finding: sitemap graph vs internal-navigation graph
+### Sitemap graph vs internal-navigation graph
 
-None of those 103 redirecting sitemap URLs appeared as an internal-link target in the fresh bounded 200-page crawl.
+Post-analysis of the fresh 200-page SearchProof graph found **zero internal-link edges targeting those 103 redirecting sitemap URLs**.
 
-So the strongest proven interpretation is:
+The strongest proven interpretation is therefore:
 
-**the current sitemap contains a shadow/residual product-state graph that is not reflected in the sampled live internal-navigation graph.**
+**the sitemap contains a shadow/residual product-state graph that is not represented in the sampled live internal-navigation graph.**
 
-This is stronger evidence for sitemap/product-state synchronization debt than for direct user-navigation loss. Direct conversion impact is not claimed without analytics.
+That supports a sitemap/product-state synchronization finding. It does **not** prove direct customer-path or conversion loss without analytics.
 
 ### Candidate invariant
 
 For a sitemap URL intended to represent an indexable product:
 
-`declared product URL → terminal intended product state`
+`in sitemap → terminal intended product state`
 
-A valid business policy can deliberately produce another state, but sitemap membership and the resulting state should agree.
+or a clearly documented alternative state policy.
 
 ---
 
-## 4. New temporal finding — sitemap changed during the audit window
+## 4. Time axis — the sitemap changed while the audit was running
 
 Two independent SearchProof snapshots were compared.
 
 Earlier snapshot:
 
-- evidence timestamp around `2026-08-11T07:47:21Z`;
+- around `2026-08-11T07:47:21Z`;
 - 36,310 sitemap URLs.
 
 Fresh snapshot:
 
-- evidence timestamp around `2026-08-11T10:05:48Z`;
+- around `2026-08-11T10:05:48Z`;
 - 36,309 sitemap URLs.
 
 Exact set difference:
 
 - 18 URLs removed;
 - 17 URLs added;
-- 17 removed/added pairs share the same product slug but moved from:
+- 17 removed/added pairs have the same product slug but moved from:
 
 `/catalog/tovary-dlya-doma/novogodnie-tovary/<slug>/`
 
@@ -158,17 +164,17 @@ into:
 
 `/catalog/tovary-dlya-doma/interer/<same-slug>/`.
 
-The old `novogodnie-tovary/` category itself disappeared from the sitemap, producing the net `-1` URL difference.
+The old `novogodnie-tovary/` category itself disappeared from sitemap, producing the net `-1` difference.
 
-This is a real `taxonomy(t1) → taxonomy(t2)` transition observed during the audit, not a historical search-engine snapshot.
+This is a real `taxonomy(t1) → taxonomy(t2)` transition observed during the audit.
 
 ---
 
-## 5. P0 temporal defect — exact taxonomy migration lands on a non-terminal new product URL
+## 5. P0 temporal finding — exact migration exists, but the new product state is non-terminal
 
-The temporal workflow traced all 17 migrated product slugs.
+The temporal workflow traced all 17 moved slugs.
 
-For all 17, the transition has the same structure:
+Every one follows the same chain:
 
 `old product URL`
 
@@ -178,289 +184,238 @@ For all 17, the transition has the same structure:
 
 `→ 200 category`
 
-The first hop preserves product identity correctly: the old product path maps to the exact same-slug path in the new taxonomy.
+So the migration layer knows the exact same-product destination, but the new product URL immediately transitions away from product state.
 
-But the new product URL then immediately leaves the product state and collapses to the category.
-
-The old category itself currently follows:
+The old category itself follows:
 
 `/novogodnie-tovary/ → 301 → /catalog/tovary-dlya-doma/ → 200`.
 
-The new `/interer/` category is 200 and self-canonical.
+The new `/interer/` category is 200/self-canonical.
 
 ### Cause hypothesis
 
-The evidence is consistent with two state-management layers interacting:
+The evidence is consistent with two state layers interacting:
 
-1. taxonomy migration knows the exact new product URL;
-2. current product availability/deactivation routing sends that new product state to an ancestor category.
+1. taxonomy migration preserves exact product identity;
+2. current product availability/deactivation behavior sends the new product URL to an ancestor category.
 
-This does **not** prove the internal CMS implementation. It does show a synchronization invariant worth testing:
+This does not prove CMS internals. It does prove a synchronization question:
 
 `new sitemap membership ↔ live terminal product state`
 
-The especially important signal is timing: these 17 `/interer/` product URLs were **newly emitted into the current sitemap**, yet the same URLs already transition away from product state.
-
-That means this is not explainable only as old sitemap residue.
+The time signal matters: those 17 `/interer/` product URLs were newly emitted into the current sitemap, yet already resolve away from product state. This cannot be explained only as very old sitemap residue.
 
 ---
 
-## 6. P1 — pagination field conflict: 160 different products vs one canonical target
+## 6. P1 — pagination has a stable field conflict even while product composition changes
 
-Pages 1–4 of the focused category were inspected as a link-state graph.
+Corrected causal v2 observed the first four category pages at `2026-08-11T10:17:04Z`.
 
-Each page exposes 40 direct product-card URLs after excluding pagination/filter controls and the known nested wet-vacuum subcategory.
+Direct product-card links at that snapshot:
 
-Observed:
+| Page | HTTP | Canonical | Direct product cards | Overlap with page 1 | New vs page 1 |
+|---:|---:|---|---:|---:|---:|
+| 1 | 200 | page 1 | 30 | 30 | 0 |
+| 2 | 200 | page 1 | 29 | 0 | 29 |
+| 3 | 200 | page 1 | 28 | 0 | 28 |
+| 4 | 200 | page 1 | 33 | 0 | 33 |
 
-- page 1: 40 product-card URLs;
-- page 2: 40 different product-card URLs;
-- page 3: 40 different product-card URLs;
-- page 4: 40 different product-card URLs.
+Across pages 1–4 the v2 snapshot exposed **120 unique direct product-card URLs**. Their union equals the sum of page counts, so the four page sets did not overlap in that snapshot.
 
-Across pages 1–4:
+An earlier causal snapshot had a larger category-link population, showing that merchandising/page composition itself is time-sensitive. The important invariant is not the exact number 120; the persistent signal is:
 
-- 160 unique product-card URLs;
-- zero product-card overlap between the four page sets;
-- all 160 are present in the current sitemap;
-- all 160 are current 200/self-canonical candidates in the focused transition evidence.
-
-At the same time:
-
-- page 2 → canonical page 1;
-- page 3 → canonical page 1;
-- page 4 → canonical page 1.
-
-This produces a clear **field conflict**:
-
-`internal content/link field: pages expose different product states`
+`content/link field: deeper pages expose different products`
 
 vs
 
-`canonical field: pages 2–4 nominate page 1 as preferred`.
+`canonical field: pages 2–4 nominate page 1`.
 
-This is not automatically declared an SEO error. The next question is empirical:
+This is not automatically labeled an SEO error. The next question is empirical:
 
-**Does Yandex reliably discover/index products whose important category discovery paths sit on page 2+ under the current canonical architecture?**
+**Does Yandex reliably discover/index deeper-page products under the current canonical architecture?**
 
-Measure before changing.
+Measure provider states before changing pagination.
 
 ---
 
-## 7. P1 — product identity collisions hidden outside the ordinary crawl
+## 7. P1 — two product identity collisions
 
-The focused active-product set exposed two identity-collision pairs that the ordinary bounded crawl did not surface as duplicate-title groups.
+The focused active-product set surfaced two independently verified pairs outside the ordinary bounded-crawl duplicate report.
 
-### Pair A — Dyson V12 Detect Slim Absolute
+### Dyson V12 Detect Slim Absolute
 
-Two distinct URLs exist:
+Two distinct URLs are simultaneously:
+
+- HTTP 200;
+- self-canonical;
+- same title;
+- same H1;
+- same JSON-LD Product `name`;
+- different JSON-LD `offers.url` values.
+
+URLs:
 
 - `.../besprovodnoy-pylesos-dyson-v12-detect-slim-absolute/`;
 - `.../besprovodnoy-pylesos-dyson-v12-detect-slim-absolute_102845/`.
 
-Both are:
+### Dyson V8 Total Clean
 
-- HTTP 200;
-- self-canonical;
-- same title;
-- same H1;
-- same JSON-LD Product `name`;
-- separate JSON-LD `offers.url` values.
-
-### Pair B — Dyson V8 Total Clean
-
-Two distinct URLs exist:
+The same pattern exists for:
 
 - `.../besprovodnoy-pylesos-dyson-v8-total-clean/`;
 - `.../besprovodnoy-pylesos-dyson-v8-total-clean_102879/`.
 
-The same identity pattern is observed:
+For both pairs the current JSON-LD parse found no populated SKU/MPN/GTIN/structured-brand identifier that clearly differentiates the two entities.
 
-- HTTP 200;
-- self-canonical;
-- same title;
-- same H1;
-- same JSON-LD Product `name`;
-- separate `offers.url` values.
+Their HTML hashes differ, so this report does **not** call them identical-body duplicates.
 
-For both pairs, the current parse found no populated `sku`, `mpn`, `gtin` or structured brand identifier that would clearly differentiate two product entities.
+The finding is narrower:
 
-The HTML hashes differ, so this report does **not** call the bodies identical duplicates.
+`two distinct self-canonical 200 URLs → same named product identity`
 
-### Interpretation
-
-This is an **entity-identity collision signal**:
-
-`two indexable/self-canonical URLs → same named product identity`
-
-Before choosing redirect/canonical/merge behavior, compare price, stock, specifications, variant semantics and internal product IDs. If they are intentionally different commercial entities, encode the distinction explicitly. If they represent the same entity, converge the search identity intentionally.
+Before choosing redirect/canonical/merge behavior, compare stock, price, specifications, variant semantics and internal product IDs.
 
 ---
 
-## 8. Current entity surface is cleaner than the historical signal suggested
+## 8. Entity/trust hypothesis was downgraded by fresher evidence
 
-The causal workflow checked 15 current key surfaces.
+The causal run checked 15 current key surfaces.
 
-Current text-surface observations:
+Observed on the current surfaces:
 
-- `10:00–19:00` matched on 15/15 checked surfaces;
-- Bereshkovskaya address text matched on 15/15;
-- `09:00–21:00` matched on 0/15;
-- legacy `ЦИФРОВАЯ ДОСТАВКА` matched on 0/15;
-- `круглосуточно` matched on 1 checked surface (`/help/delivery/`);
-- Lokomotivny address text matched on 2 checked surfaces (`/info/requisites/` and `/help/payment/`);
-- explicit VK/Telegram/YouTube/Dzen/Rutube links matched on 0/15 checked surfaces.
+- `10:00–19:00`: 15/15;
+- Bereshkovskaya text: 15/15;
+- `09:00–21:00`: 0/15;
+- legacy `ЦИФРОВАЯ ДОСТАВКА`: 0/15;
+- `круглосуточно`: 1 checked surface (`/help/delivery/`);
+- Lokomotivny text: 2 checked surfaces (`/info/requisites/`, `/help/payment/`);
+- explicit VK/Telegram/YouTube/Dzen/Rutube links: 0/15.
 
-This **downgrades** the earlier historical entity-drift concern: the live template surfaces are currently much more consistent than old search-visible residues suggested.
+This weakens the earlier historical entity-drift concern: current templates are considerably more consistent than older search-visible residues suggested.
 
-The remaining address/hour variants should be interpreted by role before calling them conflicts: legal address, customer-facing address, order acceptance and delivery/support hours can legitimately differ.
+Address/hour variants must be interpreted by business role before calling them contradictions: legal address, customer-facing address, order acceptance and delivery/support hours can legitimately differ.
 
-This is an example of the audit model correcting its own earlier hypothesis when fresher evidence is stronger.
+This is an important SearchProof behavior: a hypothesis is **downgraded** when fresher evidence is stronger.
 
 ---
 
-## 9. Graph focusing: where to spend the next unit of attention
+## 9. Graph focusing
 
-Instead of counting findings, use a focus field:
+Instead of counting findings, focus attention using:
 
 `focus ≈ reach × transition severity × evidence confidence × persistence × downstream sensitivity`
 
-No monetary value is assigned by this heuristic.
+This is a prioritization concept, not a financial score.
 
 ### Focus 1 — product-state synchronization
 
-Why first:
+Strongest because:
 
-- reaches 103 URLs in one commercial prefix;
-- transition pattern is highly regular (`302 → ancestor category → 200`);
-- mismatch exists across sitemap vs HTTP vs sampled internal-link fields;
-- same-day sitemap mutation produced 17 newly emitted non-terminal product URLs.
-
-This is the strongest upstream-system hypothesis.
+- 103 URLs share one transition family;
+- two ancestor destinations explain the cluster;
+- sitemap and sampled internal-navigation fields disagree;
+- a same-day taxonomy update emitted 17 new product URLs that are already non-terminal.
 
 ### Focus 2 — product identity uniqueness
 
-Why next:
-
-- two independently verified 200/self-canonical product identity collisions;
-- structured product identity currently does not expose SKU/MPN/GTIN differentiation in these pairs;
-- bounded remediation can be verified URL-by-URL.
+Two verified pairs expose a clean, bounded identity-governance experiment.
 
 ### Focus 3 — pagination discovery
 
-Why next:
-
-- pages 1–4 expose 160 different product cards;
-- pages 2–4 converge canonically to page 1;
-- actual search impact can be answered by Yandex URL/discovery data rather than theory.
+Different product sets sit behind pages 2–4 while canonical converges to page 1. Search-provider evidence can settle whether this currently harms discovery.
 
 ### Separate engineering field — mobile performance
 
-Existing reproducible Lighthouse evidence remains valid:
+Existing reproducible Lighthouse baseline remains:
 
 - mobile Performance 21;
 - LCP 12.0 s;
 - TBT 3,420 ms.
 
-Performance is important, but it is a different causal field from URL/product-state synchronization and should be changed/measured separately.
+Performance should be changed and verified separately from URL/product-state work so attribution remains interpretable.
 
 ---
 
-## 10. Recommended invariants
+## 10. Proposed invariants
 
-### Sitemap terminality invariant
+### Sitemap terminality
 
-For each URL intended as an indexable product:
+`index-intended product in sitemap → intended terminal product state`
 
-`in sitemap → terminal intended product state`
-
-or an explicitly documented alternative policy.
-
-### Migration identity invariant
-
-For a moved product:
+### Migration identity
 
 `old product identity → exact new product identity → terminal new product state`
 
-Avoid a migration where the exact mapping exists but immediately collapses to a broad category unless that is the deliberate business rule.
+### Product identity
 
-### Product identity invariant
+If two URLs are intentionally separate indexable entities, make the distinction explicit in human and structured identity fields. If they are the same entity, converge search identity intentionally.
 
-If two URLs are separate indexable products, they need machine- and human-readable differentiation.
-
-If they are the same product entity, their search identity should converge intentionally.
-
-### Pagination discovery invariant
+### Pagination discovery
 
 Products reachable mainly through deeper pagination should remain reliably discoverable under the chosen canonical/indexing architecture.
 
 ---
 
-## 11. Verification plan
+## 11. Verification sequence
 
-Do not fix everything at once.
+Do not change everything at once.
 
-### Experiment A — product-state sync
+### Experiment A — product-state synchronization
 
 1. Select one bounded category slice.
-2. Reconcile sitemap membership with live product state.
-3. Preserve the implementation timestamp/PR.
-4. Re-run the causal transition workflow.
-5. Observe Yandex indexed/excluded/discovery states at T+14 and T+30.
+2. Reconcile sitemap membership with intended live product state.
+3. Preserve implementation timestamp/PR.
+4. Re-run causal v2.
+5. Observe Yandex indexed/excluded/discovery/query states at T+14 and T+30.
 
-Success evidence is a state change such as:
-
-`declared non-terminal product URL → intended terminal/indexing policy`
-
-plus provider observation.
-
-### Experiment B — identity collision
+### Experiment B — one identity pair
 
 1. Resolve the actual business identity of one Dyson pair.
-2. Apply the appropriate merge/redirect/canonical/variant differentiation.
+2. Apply merge/redirect/canonical/variant differentiation according to the business truth.
 3. Re-run page evidence.
 4. Observe Yandex URL/query state afterward.
 
 ### Experiment C — pagination
 
-1. Build a controlled list of page-2+ products.
+1. Freeze a controlled list of products from page 2+.
 2. Record current Yandex discovery/index/query states.
-3. Change pagination architecture only if the data supports the hypothesis.
+3. Change architecture only if evidence supports the hypothesis.
 4. Re-observe at a fixed window.
 
 ---
 
 ## 12. Measurement integrity
 
-The first causal workflow contained its own classification limitation: the initial focus heuristic counted root-category redirects but placed 10 nested-subcategory redirects in `replacement_or_other_redirect`.
+The first causal workflow discovered the pattern but its focus classifier placed 10 nested-subcategory redirects into `replacement_or_other_redirect`.
 
-Artifact inspection showed that all 10 actually terminate at the ancestor `vertikalnye-moyushchie-pylesosy` category with the same `302 → 200` transition pattern.
+Artifact inspection showed all 10 were actually ancestor-category transitions with the same `302 → 200` family.
 
-Therefore:
+Actions taken:
 
-- the client-facing corrected count is **103 ancestor-category transitions**;
-- the initial v1 focus reach/score is not used as the final metric;
-- a corrected v2 workflow was added so future snapshots classify ancestor-category transitions directly.
+- client-facing count corrected to 103;
+- v1 focus score retired;
+- corrected v2 classifier implemented;
+- v2 independently confirmed `194 unique_200_candidate + 103 ancestor_category_redirect + 1 category_200`;
+- superseded v1 workflow removed after v2 passed;
+- v1 artifact retained as historical evidence.
 
-This follows the same SearchProof rule used earlier in the case:
-
-**verify the measurement layer before trusting the conclusion.**
+The measurement system is part of the test surface.
 
 ---
 
-## 13. What is not claimed
+## 13. Integrity boundaries
 
-This report does not claim:
+This report does **not** claim:
 
-- that 103 URLs represent 103 lost sales;
-- that 34.6% of the whole catalog is broken;
-- that a 302 redirect caused a measured ranking loss;
-- that pagination canonicalization has already reduced traffic;
-- that the Dyson pairs are identical-body duplicate pages;
-- that different legal/customer-facing addresses are inherently wrong;
-- that Lighthouse lab metrics equal field Core Web Vitals;
-- that any observed traffic/revenue movement would automatically prove causality.
+- 103 lost sales;
+- 34.6% of the whole catalog/site is broken;
+- measured ranking loss from the 302 transitions;
+- measured traffic loss from pagination canonicalization;
+- identical-body duplication for the Dyson pairs;
+- that legal/customer-facing address differences are inherently errors;
+- that Lighthouse lab values equal field Core Web Vitals;
+- causal revenue impact before provider/business observations.
 
-The stronger model is:
+The final model is:
 
 `state evidence → transition evidence → cross-field conflict → focused cause hypothesis → one bounded change → time/provider/business verification`
