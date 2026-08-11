@@ -1,8 +1,8 @@
 const compact = (value = '') => String(value).replace(/\s+/g, ' ').trim();
 
 function attrFromTag(tag, attr) {
-  const match = tag.match(new RegExp(`\\b${attr}\\s*=\\s*["']([^"']*)["']`, 'i'));
-  return match?.[1] ?? '';
+  const match = tag.match(new RegExp(`\\b${attr}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, 'i'));
+  return match?.[2] ?? '';
 }
 
 function tagContent(html, tag) {
