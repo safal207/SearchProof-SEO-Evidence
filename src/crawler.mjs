@@ -109,6 +109,12 @@ export function parseSitemap(xml, origin) {
   return [...new Set(urls)];
 }
 
+function sitemapDocumentKind(xml) {
+  if (/<sitemapindex\b/i.test(xml)) return 'index';
+  if (/<urlset\b/i.test(xml)) return 'urlset';
+  return 'unknown';
+}
+
 function duplicateGroups(pages, field, transform = (value) => compact(value).toLowerCase()) {
   const buckets = new Map();
   for (const page of pages) {
@@ -144,18 +150,60 @@ async function safeFetch(fetchImpl, url, headers, timeoutMs) {
   }
 }
 
+async function resolveSitemapTree({ rootUrl, origin, fetchImpl, headers, timeoutMs, maxSitemaps = 50, maxDepth = 3 }) {
+  const queue = [{ url: rootUrl, depth: 0 }];
+  const queued = new Set([rootUrl]);
+  const visited = new Set();
+  const pageUrls = [];
+  const sources = [];
+  let rootStatus = 0;
+
+  while (queue.length && visited.size < maxSitemaps) {
+    const current = queue.shift();
+    if (!current || visited.has(current.url)) continue;
+    visited.add(current.url);
+
+    const response = await safeFetch(fetchImpl, current.url, headers, timeoutMs);
+    if (current.depth === 0) rootStatus = response.status;
+    const ok = response.status >= 200 && response.status < 400;
+    const kind = ok ? sitemapDocumentKind(response.body) : 'unknown';
+    const locs = ok ? parseSitemap(response.body, origin) : [];
+    sources.push({ url: current.url, status: response.status, kind, locs: locs.length });
+
+    if (!ok) continue;
+    if (kind === 'index') {
+      if (current.depth >= maxDepth) continue;
+      for (const child of locs) {
+        if (visited.has(child) || queued.has(child)) continue;
+        if (queued.size >= maxSitemaps) break;
+        queued.add(child);
+        queue.push({ url: child, depth: current.depth + 1 });
+      }
+      continue;
+    }
+
+    pageUrls.push(...locs);
+  }
+
+  return {
+    url: rootUrl,
+    status: rootStatus,
+    urls: [...new Set(pageUrls)],
+    sources
+  };
+}
+
 async function discoverSitemap({ seed, origin, fetchImpl, headers, timeoutMs }) {
   const scoped = normalizeUrl('sitemap.xml', seed);
   const root = `${origin}/sitemap.xml`;
   const candidates = [...new Set([scoped, root].filter(Boolean))];
-  let best = { url: candidates[0] || root, status: 0, urls: [] };
+  let best = { url: candidates[0] || root, status: 0, urls: [], sources: [] };
 
   for (const url of candidates) {
-    const response = await safeFetch(fetchImpl, url, headers, timeoutMs);
-    const ok = response.status >= 200 && response.status < 400;
-    const urls = ok ? parseSitemap(response.body, origin) : [];
-    if (ok && urls.length) return { url, status: response.status, urls };
-    if (best.status === 0 || ok) best = { url, status: response.status, urls };
+    const resolved = await resolveSitemapTree({ rootUrl: url, origin, fetchImpl, headers, timeoutMs });
+    const ok = resolved.status >= 200 && resolved.status < 400;
+    if (ok && resolved.urls.length) return resolved;
+    if (best.status === 0 || ok) best = resolved;
   }
 
   return best;
@@ -277,12 +325,13 @@ export async function crawlSite({
       htmlPages: htmlPages.length,
       internalEdges: uniqueEdges.length,
       sitemapUrls: sitemapUrls.length,
+      sitemapSources: sitemap.sources.length,
       brokenInternalLinks: brokenInternalLinks.length,
       duplicateTitleGroups: duplicateTitles.length,
       canonicalMismatches: canonicalMismatches.length,
       orphanLikeUrls: orphanLike.length
     },
-    sitemap: { url: sitemapUrl, status: sitemap.status, urls: sitemapUrls, orphanLike, crawledMissingFromSitemap },
+    sitemap: { url: sitemapUrl, status: sitemap.status, urls: sitemapUrls, sources: sitemap.sources, orphanLike, crawledMissingFromSitemap },
     pages,
     graph: { nodes: pages.map((page) => ({ url: page.url, status: page.status, depth: page.depth, title: page.title, logicalUrl: logicalPageUrl(page) })), edges: uniqueEdges },
     duplicates: { titles: duplicateTitles, descriptions: duplicateDescriptions, h1s: duplicateH1s },
