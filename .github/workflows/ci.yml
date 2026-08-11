@@ -26,13 +26,13 @@ jobs:
       - name: Install
         run: npm install --ignore-scripts --no-audit --no-fund
 
-      - name: Verify deterministic audit engine and dashboard contracts
+      - name: Verify deterministic page audit, crawler and dashboard contracts
         run: npm run verify
 
   live-example:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,10 +42,13 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Run live public-case audit
+      - name: Run live public-case page audit
         run: npm run audit -- https://safal207.github.io/robys-coffee-house-demo/
 
-      - name: Upload evidence report
+      - name: Run live public-case site crawl
+        run: npm run crawl -- https://safal207.github.io/robys-coffee-house-demo/ --max-pages=40 --max-depth=3
+
+      - name: Upload evidence reports
         uses: actions/upload-artifact@v4
         with:
           name: robys-searchproof-evidence
