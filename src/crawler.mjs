@@ -232,6 +232,7 @@ export async function crawlSite({
   const pages = [];
   const edges = [];
   let crawlCapacityHit = false;
+  let crawlDepthLimitHit = false;
 
   while (queue.length && pages.length < maxPages) {
     const current = queue.shift();
@@ -263,18 +264,22 @@ export async function crawlSite({
     if (!isHtml) continue;
     for (const target of signals.internalLinks) {
       edges.push({ from: finalUrl, to: target });
-      if (current.depth < maxDepth && !visited.has(target) && !queued.has(target)) {
-        if (pages.length + queue.length < maxPages) {
-          queued.add(target);
-          queue.push({ url: target, depth: current.depth + 1 });
-        } else {
-          crawlCapacityHit = true;
-        }
+      if (visited.has(target) || queued.has(target)) continue;
+      if (current.depth >= maxDepth) {
+        crawlDepthLimitHit = true;
+        continue;
+      }
+      if (pages.length + queue.length < maxPages) {
+        queued.add(target);
+        queue.push({ url: target, depth: current.depth + 1 });
+      } else {
+        crawlCapacityHit = true;
       }
     }
   }
 
   const crawlTruncated = pages.length >= maxPages && (queue.length > 0 || crawlCapacityHit);
+  const crawlCoveragePartial = crawlTruncated || crawlDepthLimitHit;
   const uniqueEdges = [...new Map(edges.map((edge) => [`${edge.from}\n${edge.to}`, edge])).values()];
   const pageByUrl = new Map();
   for (const page of pages) {
@@ -308,7 +313,7 @@ export async function crawlSite({
   }
 
   const undiscoveredSitemapUrls = sitemapUrls.filter((url) => url !== seed && !discoveredUrls.has(url));
-  const orphanLike = crawlTruncated ? [] : undiscoveredSitemapUrls;
+  const orphanLike = crawlCoveragePartial ? [] : undiscoveredSitemapUrls;
   const crawledMissingFromSitemap = sitemapUrls.length
     ? [...crawledUrls].filter((url) => !sitemapUrls.includes(url))
     : [];
@@ -321,8 +326,11 @@ export async function crawlSite({
   if (duplicateH1s.length) findings.push(finding({ id: 'duplicate-h1', severity: 'info', message: 'Multiple pages share the same primary H1', evidence: `${duplicateH1s.length} duplicate H1 group(s)`, recommendation: 'Review whether repeated H1s reflect intentional templates or unresolved intent overlap.', metric: 'H1 uniqueness / intent mapping', affectedUrls: [...new Set(duplicateH1s.flatMap((group) => group.urls))] }));
   if (duplicateDescriptions.length) findings.push(finding({ id: 'duplicate-descriptions', severity: 'info', message: 'Multiple pages share the same meta description', evidence: `${duplicateDescriptions.length} duplicate description group(s)`, recommendation: 'Make descriptions page-specific when that improves clarity; snippets remain search-engine selected.', metric: 'description uniqueness / CTR observation', affectedUrls: [...new Set(duplicateDescriptions.flatMap((group) => group.urls))] }));
   if (canonicalMismatches.length) findings.push(finding({ id: 'canonical-mismatches', severity: 'warn', message: 'Pages declare canonicals that differ from their crawled URL', evidence: `${canonicalMismatches.length} canonical mismatch(es)`, recommendation: 'Verify that each alternate canonical is intentional, indexable and consistent with internal linking.', metric: 'canonical selection / duplicate URL state', affectedUrls: canonicalMismatches.map((item) => item.url) }));
-  if (crawlTruncated && undiscoveredSitemapUrls.length) findings.push(finding({ id: 'sitemap-coverage-partial', severity: 'info', message: 'Sitemap orphan analysis is incomplete because the crawl hit its page limit', evidence: `${undiscoveredSitemapUrls.length} sitemap URL(s) were not reached before maxPages=${maxPages}`, recommendation: 'Increase crawl scope or audit a focused sitemap/category slice before classifying orphan-like URLs.', metric: 'crawl completeness / sitemap coverage' }));
-  if (orphanLike.length) findings.push(finding({ id: 'sitemap-orphan-like', severity: 'warn', message: 'Sitemap URLs were not discovered through the crawled internal-link graph', evidence: `${orphanLike.length} sitemap URL(s) undiscovered within a non-truncated crawl`, recommendation: 'Check whether important sitemap URLs have ordinary internal links. This is an orphan-like heuristic, not proof of a true orphan.', metric: 'crawl discovery / internal link graph', affectedUrls: orphanLike }));
+  if (crawlCoveragePartial && undiscoveredSitemapUrls.length) {
+    const reasons = [crawlTruncated ? `maxPages=${maxPages}` : '', crawlDepthLimitHit ? `maxDepth=${maxDepth}` : ''].filter(Boolean).join(', ');
+    findings.push(finding({ id: 'sitemap-coverage-partial', severity: 'info', message: 'Sitemap orphan analysis is incomplete because the crawl scope was limited', evidence: `${undiscoveredSitemapUrls.length} sitemap URL(s) were not discovered within ${reasons || 'the configured crawl scope'}`, recommendation: 'Increase crawl scope or audit a focused sitemap/category slice before classifying orphan-like URLs.', metric: 'crawl completeness / sitemap coverage' }));
+  }
+  if (orphanLike.length) findings.push(finding({ id: 'sitemap-orphan-like', severity: 'warn', message: 'Sitemap URLs were not discovered through the crawled internal-link graph', evidence: `${orphanLike.length} sitemap URL(s) undiscovered within a complete configured crawl`, recommendation: 'Check whether important sitemap URLs have ordinary internal links. This is an orphan-like heuristic, not proof of a true orphan.', metric: 'crawl discovery / internal link graph', affectedUrls: orphanLike }));
   if (crawledMissingFromSitemap.length) findings.push(finding({ id: 'crawl-not-in-sitemap', severity: 'info', message: 'Crawled HTML pages are absent from the conventional sitemap', evidence: `${crawledMissingFromSitemap.length} crawled page(s) not present in sitemap.xml`, recommendation: 'Review whether these pages should be represented in the submitted sitemap.', metric: 'sitemap coverage', affectedUrls: crawledMissingFromSitemap }));
 
   return {
@@ -335,13 +343,15 @@ export async function crawlSite({
       sitemapUrls: sitemapUrls.length,
       sitemapSources: sitemap.sources.length,
       crawlTruncated,
+      crawlDepthLimitHit,
+      crawlCoveragePartial,
       sitemapUrlsUndiscoveredWithinCrawl: undiscoveredSitemapUrls.length,
       brokenInternalLinks: brokenInternalLinks.length,
       duplicateTitleGroups: duplicateTitles.length,
       canonicalMismatches: canonicalMismatches.length,
       orphanLikeUrls: orphanLike.length
     },
-    sitemap: { url: sitemapUrl, status: sitemap.status, urls: sitemapUrls, sources: sitemap.sources, crawlTruncated, undiscoveredWithinCrawl: undiscoveredSitemapUrls, orphanLike, crawledMissingFromSitemap },
+    sitemap: { url: sitemapUrl, status: sitemap.status, urls: sitemapUrls, sources: sitemap.sources, crawlTruncated, crawlDepthLimitHit, crawlCoveragePartial, undiscoveredWithinCrawl: undiscoveredSitemapUrls, orphanLike, crawledMissingFromSitemap },
     pages,
     graph: { nodes: pages.map((page) => ({ url: page.url, status: page.status, depth: page.depth, title: page.title, logicalUrl: logicalPageUrl(page) })), edges: uniqueEdges },
     duplicates: { titles: duplicateTitles, descriptions: duplicateDescriptions, h1s: duplicateH1s },
