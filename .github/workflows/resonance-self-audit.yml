@@ -1,0 +1,51 @@
+name: SearchProof × RESONANCE Self Audit
+
+on:
+  push:
+    branches:
+      - agent/resonance-self-audit
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      TARGET_URL: https://safal207.github.io/RESONANCE/
+    steps:
+      - name: Checkout SearchProof
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Validate public target
+        id: target
+        run: node src/remote-target.mjs "$TARGET_URL"
+
+      - name: Crawl live RESONANCE
+        run: npm run crawl -- "${{ steps.target.outputs.target }}" --max-pages=50 --max-depth=3
+
+      - name: Build evidence summary
+        env:
+          SEARCHPROOF_MODE: site
+          SEARCHPROOF_TARGET: ${{ steps.target.outputs.target }}
+        run: node scripts/github-summary.mjs
+
+      - name: Upload SearchProof evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: resonance-searchproof-self-audit-${{ github.run_id }}
+          path: |
+            reports/*.json
+            reports/github-summary.md
+          if-no-files-found: error
+          retention-days: 14
