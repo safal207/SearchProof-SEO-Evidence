@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 const index = await fs.readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 const app = await fs.readFile(new URL('../public/app.js', import.meta.url), 'utf8');
 const styles = await fs.readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+const remoteAuditCss = await fs.readFile(new URL('../public/remote-audit.css', import.meta.url), 'utf8');
 const report = JSON.parse(await fs.readFile(new URL('../public/example-report.json', import.meta.url), 'utf8'));
 const experiment = JSON.parse(await fs.readFile(new URL('../public/example-experiment.json', import.meta.url), 'utf8'));
 const experimentCss = await fs.readFile(new URL('../public/experiment.css', import.meta.url), 'utf8');
@@ -17,7 +18,9 @@ assert.match(index, /data-i18n="evidenceDashboard"/);
 assert.match(index, /Observed delta ≠ causal attribution/);
 assert.match(index, /TOTAL_SHOWS/);
 assert.match(index, /experiment\.css/);
-assert.match(index, /SearchProof v0\.3\.1/);
+assert.match(index, /remote-audit\.css/);
+assert.match(index, /actions\/workflows\/remote-audit\.yml/);
+assert.match(index, /Run on GitHub \/ Запустить в GitHub/);
 
 assert.match(app, /SEO-рекомендации стоят дёшево/);
 assert.match(app, /Наблюдаемое изменение ≠ доказанная причинность/);
@@ -36,8 +39,10 @@ assert.match(styles, /touch-action: manipulation/);
 assert.match(experimentCss, /\.metric-value small/);
 assert.match(experimentCss, /@media \(max-width: 620px\)/);
 assert.match(experimentCss, /grid-template-columns: 1fr;/);
+assert.match(remoteAuditCss, /\.github-run-button/);
+assert.match(remoteAuditCss, /min-height: 44px/);
 
-assert.equal(pkg.version, '0.3.1');
+assert.equal(pkg.version, '0.3.2');
 assert.equal(report.meta.kind, 'fixture');
 assert.match(report.meta.note, /does not represent measured rankings/i);
 assert.equal(typeof report.scores.overall, 'number');
@@ -47,4 +52,4 @@ assert.match(experiment.meta.note, /not measured rankings/i);
 assert.equal(experiment.experiment.integrity.causalClaim, false);
 assert.ok(Array.isArray(experiment.experiment.verification.metrics));
 
-console.log('SearchProof bilingual + mobile dashboard integrity: PASS');
+console.log('SearchProof bilingual + mobile + GitHub remote audit integrity: PASS');
