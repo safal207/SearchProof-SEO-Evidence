@@ -42,6 +42,19 @@ test('does not classify undiscovered sitemap URLs as orphan-like when crawl hits
   const report = await crawlSite({ startUrl: `${origin}/`, fetchImpl: mockFetch, maxPages: 1, maxDepth: 3, timeoutMs: 1000 });
 
   assert.equal(report.summary.crawlTruncated, true);
+  assert.equal(report.summary.crawlCoveragePartial, true);
+  assert.equal(report.summary.orphanLikeUrls, 0);
+  assert.equal(report.summary.sitemapUrlsUndiscoveredWithinCrawl, 2);
+  assert.equal(report.findings.some((finding) => finding.id === 'sitemap-orphan-like'), false);
+  assert.equal(report.findings.some((finding) => finding.id === 'sitemap-coverage-partial'), true);
+});
+
+test('does not classify undiscovered sitemap URLs as orphan-like when maxDepth limits traversal', async () => {
+  const report = await crawlSite({ startUrl: `${origin}/`, fetchImpl: mockFetch, maxPages: 10, maxDepth: 0, timeoutMs: 1000 });
+
+  assert.equal(report.summary.crawlTruncated, false);
+  assert.equal(report.summary.crawlDepthLimitHit, true);
+  assert.equal(report.summary.crawlCoveragePartial, true);
   assert.equal(report.summary.orphanLikeUrls, 0);
   assert.equal(report.summary.sitemapUrlsUndiscoveredWithinCrawl, 2);
   assert.equal(report.findings.some((finding) => finding.id === 'sitemap-orphan-like'), false);
