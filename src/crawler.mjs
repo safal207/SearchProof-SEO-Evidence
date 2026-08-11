@@ -231,6 +231,7 @@ export async function crawlSite({
   const visited = new Set();
   const pages = [];
   const edges = [];
+  let crawlCapacityHit = false;
 
   while (queue.length && pages.length < maxPages) {
     const current = queue.shift();
@@ -262,14 +263,18 @@ export async function crawlSite({
     if (!isHtml) continue;
     for (const target of signals.internalLinks) {
       edges.push({ from: finalUrl, to: target });
-      if (current.depth < maxDepth && !visited.has(target) && !queued.has(target) && pages.length + queue.length < maxPages) {
-        queued.add(target);
-        queue.push({ url: target, depth: current.depth + 1 });
+      if (current.depth < maxDepth && !visited.has(target) && !queued.has(target)) {
+        if (pages.length + queue.length < maxPages) {
+          queued.add(target);
+          queue.push({ url: target, depth: current.depth + 1 });
+        } else {
+          crawlCapacityHit = true;
+        }
       }
     }
   }
 
-  const crawlTruncated = pages.length >= maxPages && queue.length > 0;
+  const crawlTruncated = pages.length >= maxPages && (queue.length > 0 || crawlCapacityHit);
   const uniqueEdges = [...new Map(edges.map((edge) => [`${edge.from}\n${edge.to}`, edge])).values()];
   const pageByUrl = new Map();
   for (const page of pages) {
