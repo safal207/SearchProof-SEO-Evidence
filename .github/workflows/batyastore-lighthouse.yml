@@ -1,0 +1,135 @@
+name: BatyaStore Lighthouse Evidence
+
+on:
+  push:
+    branches:
+      - audit/batyastore-full-audit-v2
+    paths:
+      - .github/workflows/batyastore-lighthouse.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout SearchProof
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Record runtime versions
+        run: |
+          mkdir -p reports/lighthouse
+          node --version | tee reports/lighthouse/node-version.txt
+          (google-chrome --version || chromium --version || chromium-browser --version) | tee reports/lighthouse/chrome-version.txt
+          npx --yes lighthouse --version | tee reports/lighthouse/lighthouse-version.txt
+
+      - name: Lighthouse mobile baseline
+        run: |
+          npx --yes lighthouse "https://batyastore.ru/" \
+            --quiet \
+            --chrome-flags="--headless --no-sandbox" \
+            --only-categories=performance,accessibility,best-practices,seo \
+            --output=json \
+            --output-path=reports/lighthouse/batyastore-home-mobile.json
+
+      - name: Lighthouse desktop baseline
+        run: |
+          npx --yes lighthouse "https://batyastore.ru/" \
+            --quiet \
+            --preset=desktop \
+            --chrome-flags="--headless --no-sandbox" \
+            --only-categories=performance,accessibility,best-practices,seo \
+            --output=json \
+            --output-path=reports/lighthouse/batyastore-home-desktop.json
+
+      - name: Build evidence summary
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+
+          const variants = [
+            ['mobile', 'reports/lighthouse/batyastore-home-mobile.json'],
+            ['desktop', 'reports/lighthouse/batyastore-home-desktop.json']
+          ];
+
+          const rows = [];
+          const evidence = {
+            target: 'https://batyastore.ru/',
+            generatedAt: new Date().toISOString(),
+            integrity: 'Lighthouse is a lab measurement. It is not field Core Web Vitals and does not prove ranking or revenue impact.',
+            runs: []
+          };
+
+          for (const [variant, file] of variants) {
+            const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+            const score = (id) => Math.round((report.categories?.[id]?.score ?? 0) * 100);
+            const numeric = (id) => report.audits?.[id]?.numericValue ?? null;
+            const display = (id) => report.audits?.[id]?.displayValue ?? null;
+            const run = {
+              variant,
+              finalUrl: report.finalDisplayedUrl || report.finalUrl || '',
+              lighthouseVersion: report.lighthouseVersion,
+              fetchTime: report.fetchTime,
+              scores: {
+                performance: score('performance'),
+                accessibility: score('accessibility'),
+                bestPractices: score('best-practices'),
+                seo: score('seo')
+              },
+              metrics: {
+                fcpMs: numeric('first-contentful-paint'),
+                lcpMs: numeric('largest-contentful-paint'),
+                tbtMs: numeric('total-blocking-time'),
+                cls: numeric('cumulative-layout-shift'),
+                speedIndexMs: numeric('speed-index'),
+                interactiveMs: numeric('interactive')
+              },
+              display: {
+                fcp: display('first-contentful-paint'),
+                lcp: display('largest-contentful-paint'),
+                tbt: display('total-blocking-time'),
+                cls: display('cumulative-layout-shift'),
+                speedIndex: display('speed-index'),
+                interactive: display('interactive')
+              }
+            };
+            evidence.runs.push(run);
+            rows.push(`| ${variant} | ${run.scores.performance} | ${run.scores.accessibility} | ${run.scores.bestPractices} | ${run.scores.seo} | ${run.display.lcp ?? 'n/a'} | ${run.display.tbt ?? 'n/a'} | ${run.display.cls ?? 'n/a'} |`);
+          }
+
+          fs.writeFileSync('reports/lighthouse/batyastore-lighthouse-evidence.json', JSON.stringify(evidence, null, 2));
+
+          const summary = [
+            '# BatyaStore Lighthouse evidence',
+            '',
+            '- Target: https://batyastore.ru/',
+            `- Generated: ${evidence.generatedAt}`,
+            '- Integrity: lab Lighthouse baseline; not field Core Web Vitals and not a ranking/revenue guarantee.',
+            '',
+            '| profile | performance | accessibility | best practices | SEO | LCP | TBT | CLS |',
+            '|---|---:|---:|---:|---:|---:|---:|---:|',
+            ...rows,
+            '',
+            'Raw Lighthouse JSON is uploaded in the workflow artifact for reproducibility.'
+          ].join('\n');
+
+          fs.writeFileSync('reports/lighthouse/summary.md', summary);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
+          console.log(summary);
+          NODE
+
+      - name: Upload Lighthouse evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: batyastore-lighthouse-${{ github.run_id }}
+          path: reports/lighthouse/
+          if-no-files-found: error
+          retention-days: 14

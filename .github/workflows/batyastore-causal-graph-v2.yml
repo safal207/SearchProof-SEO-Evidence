@@ -1,0 +1,153 @@
+name: BatyaStore Causal Graph Audit v2
+
+on:
+  push:
+    branches:
+      - audit/batyastore-full-audit-v2
+    paths:
+      - .github/workflows/batyastore-causal-graph-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  causal-audit-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Corrected causal transition audit
+        run: |
+          mkdir -p reports/batyastore-causal-v2
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+
+          const ORIGIN='https://batyastore.ru';
+          const CATEGORY='/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/';
+          const CATEGORY_URL=`${ORIGIN}${CATEGORY}`;
+          const OUT='reports/batyastore-causal-v2';
+          const observedAt=new Date().toISOString();
+          const norm=u=>{const x=new URL(u,ORIGIN);x.hash='';return x.toString().replace(/\/$/,'')};
+          const same=(a,b)=>norm(a)===norm(b);
+          const sha=s=>crypto.createHash('sha256').update(s||'').digest('hex');
+          const title=html=>(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+          const h1=html=>(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1]||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+          const canonical=html=>{
+            const a=html.match(/<link[^>]+rel=["'][^"']*canonical[^"']*["'][^>]+href=["']([^"']+)["']/i)?.[1]
+              ||html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*canonical[^"']*["']/i)?.[1]||'';
+            return a?new URL(a,ORIGIN).toString():'';
+          };
+          const isAncestor=(ancestor,child)=>{
+            const a=new URL(ancestor,ORIGIN), c=new URL(child,ORIGIN);
+            if(a.origin!==c.origin) return false;
+            const ap=a.pathname.endsWith('/')?a.pathname:a.pathname+'/';
+            const cp=c.pathname.endsWith('/')?c.pathname:c.pathname+'/';
+            return cp.startsWith(ap) && ap!==cp;
+          };
+          async function req(url,redirect='follow'){
+            const ac=new AbortController();const tm=setTimeout(()=>ac.abort(),15000);
+            try{return await fetch(url,{redirect,headers:{'user-agent':'SearchProof-Evidence/0.3 causal-v2'},signal:ac.signal});}
+            finally{clearTimeout(tm)}
+          }
+          async function trace(url){
+            const chain=[];let cur=url,body='',headers={},status='';
+            for(let i=0;i<6;i++){
+              try{
+                const r=await req(cur,'manual');status=r.status;headers=Object.fromEntries(r.headers.entries());
+                const loc=r.headers.get('location');chain.push({url:cur,status:r.status,location:loc?new URL(loc,cur).toString():null});
+                if(r.status>=300&&r.status<400&&loc){cur=new URL(loc,cur).toString();continue;}
+                body=await r.text();break;
+              }catch(e){status='error';chain.push({url:cur,status:'error',error:String(e)});break}
+            }
+            return {requested:url,finalUrl:cur,status,chain,body,headers};
+          }
+          async function resolveSitemap(){
+            const q=[`${ORIGIN}/sitemap.xml`],seen=new Set(),pages=new Set(),docs=[];
+            while(q.length&&seen.size<30){
+              const u=q.shift();if(seen.has(u))continue;seen.add(u);
+              try{
+                const r=await req(u);const body=await r.text();docs.push({url:u,status:r.status,sha256:sha(body)});
+                if(!r.ok)continue;
+                const locs=[...body.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)].map(m=>m[1].trim());
+                if(/<sitemapindex[\s>]/i.test(body)){
+                  for(const loc of locs){const x=new URL(loc,ORIGIN);if(x.origin===ORIGIN)q.push(x.toString())}
+                }else{
+                  for(const loc of locs){const x=new URL(loc,ORIGIN);if(x.origin===ORIGIN)pages.add(x.toString())}
+                }
+              }catch(e){docs.push({url:u,status:'error',error:String(e)})}
+            }
+            return {docs,pages:[...pages]};
+          }
+          function classify(r){
+            const can=canonical(r.body);
+            let state='other';
+            if(r.status===404)state='404';
+            else if(r.status===410)state='410';
+            else if(r.status===200&&same(r.requested,CATEGORY_URL)&&same(r.finalUrl,CATEGORY_URL))state='category_200';
+            else if(r.status===200&&!same(r.requested,r.finalUrl)&&isAncestor(r.finalUrl,r.requested))state='ancestor_category_redirect';
+            else if(r.status===200&&!same(r.requested,r.finalUrl))state='replacement_or_other_redirect';
+            else if(r.status===200&&can&&same(can,CATEGORY_URL))state='product_200_canonical_to_category';
+            else if(r.status===200&&can&&!same(can,r.requested))state='product_200_canonical_elsewhere';
+            else if(r.status===200)state='unique_200_candidate';
+            return {requested:r.requested,status:r.status,finalUrl:r.finalUrl,canonical:can,title:title(r.body),h1:h1(r.body),state,chain:r.chain,htmlSha256:sha(r.body)};
+          }
+          function links(html,base){
+            const out=[];for(const m of html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["']/gi)){try{const u=new URL(m[1],base);if(u.origin===ORIGIN)out.push(u.toString())}catch{}}
+            return [...new Set(out)];
+          }
+          function directProductLinks(html,base){
+            const nestedCategory=`${CATEGORY}vertikalnye-moyushchie-pylesosy/`;
+            return links(html,base).filter(u=>{
+              const x=new URL(u);if(x.search)return false;
+              if(!x.pathname.startsWith(CATEGORY)||x.pathname===CATEGORY||x.pathname===nestedCategory)return false;
+              const rest=x.pathname.slice(CATEGORY.length).replace(/\/$/,'');
+              return rest && !rest.includes('/');
+            });
+          }
+
+          const sm=await resolveSitemap();
+          const slice=sm.pages.filter(u=>new URL(u).pathname.startsWith(CATEGORY));
+          const rows=new Array(slice.length);let cursor=0;
+          async function worker(){while(true){const i=cursor++;if(i>=slice.length)break;rows[i]=classify(await trace(slice[i]));}}
+          await Promise.all(Array.from({length:8},worker));
+          const counts={};for(const r of rows)counts[r.state]=(counts[r.state]||0)+1;
+          const ancestorRows=rows.filter(r=>r.state==='ancestor_category_redirect');
+          const destinationCounts={};const chainCounts={};
+          for(const r of ancestorRows){destinationCounts[r.finalUrl]=(destinationCounts[r.finalUrl]||0)+1;const k=r.chain.map(x=>x.status).join('→');chainCounts[k]=(chainCounts[k]||0)+1}
+
+          const pageUrls=[CATEGORY_URL,...[2,3,4].map(n=>`${CATEGORY_URL}?PAGEN_1=${n}`)];
+          const pages=[];
+          for(const u of pageUrls){const r=await trace(u);pages.push({url:u,status:r.status,canonical:canonical(r.body),products:directProductLinks(r.body,r.finalUrl)})}
+          const p1=new Set(pages[0].products);
+          const pagination=pages.map((p,i)=>({page:i+1,url:p.url,status:p.status,canonical:p.canonical,productCount:p.products.length,overlapWithPage1:p.products.filter(x=>p1.has(x)).length,newVsPage1:p.products.filter(x=>!p1.has(x)).length}));
+          const union=new Set(pages.flatMap(x=>x.products));
+
+          const graph={nodes:[],edges:[]};const seenNodes=new Set();
+          const node=(id,type,data={})=>{if(!seenNodes.has(id)){seenNodes.add(id);graph.nodes.push({id,type,observedAt,...data})}};
+          const edge=(from,to,type,data={})=>graph.edges.push({from,to,type,observedAt,...data});
+          node('sitemap','source');
+          for(const r of rows){node(r.requested,'declared_url',{state:r.state});node(r.finalUrl,'final_url',{status:r.status});edge('sitemap',r.requested,'declares');edge(r.requested,r.finalUrl,'transitions_to',{chain:r.chain.map(x=>x.status)});if(r.canonical){node(r.canonical,'canonical_target');edge(r.finalUrl,r.canonical,'canonicalizes_to')}}
+          for(const p of pages){node(p.url,'pagination_surface',{status:p.status});for(const u of p.products){node(u,'product_url');edge(p.url,u,'exposes_product')}}
+
+          const report={observedAt,target:ORIGIN,model:'state → transition → field conflict → downstream hypothesis → verification',sitemap:{totalUrls:sm.pages.length,focusedPrefixUrls:slice.length,counts,destinationCounts,chainCounts},pagination:{pages:pagination,uniqueProductsAcrossPages1to4:union.size},graph,integrity:[
+            'ancestor_category_redirect means the final 200 URL is a path ancestor of the declared URL after a redirect chain.',
+            'No ranking/traffic/revenue loss is inferred from redirects or canonical signals without provider/business data.',
+            'Pagination product counts use direct child product-like URLs and explicitly exclude the known nested wet-vacuum subcategory.'
+          ]};
+          fs.writeFileSync(`${OUT}/report.json`,JSON.stringify(report,null,2));
+          const md=['# BatyaStore causal graph audit v2','',`Observed: ${observedAt}`,`Sitemap URLs: ${sm.pages.length}`,`Focused prefix URLs: ${slice.length}`,'','## Corrected state distribution','', '| state | URLs |','|---|---:|',...Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`| ${k} | ${v} |`),'','## Ancestor redirect destinations','',...Object.entries(destinationCounts).map(([k,v])=>`- ${v} → ${k}`),'',`Redirect-chain patterns: ${JSON.stringify(chainCounts)}`,'','## Pagination field','', '| page | status | canonical | product cards | overlap with page 1 | new vs page 1 |','|---:|---:|---|---:|---:|---:|',...pagination.map(x=>`| ${x.page} | ${x.status} | ${x.canonical} | ${x.productCount} | ${x.overlapWithPage1} | ${x.newVsPage1} |`),'',`Unique product-card URLs exposed across pages 1–4: ${union.size}`,'','## Integrity','',...report.integrity.map(x=>`- ${x}`)];
+          const summary=md.join('\n');fs.writeFileSync(`${OUT}/summary.md`,summary);fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,summary+'\n');console.log(summary);
+          NODE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: batyastore-causal-v2-${{ github.run_id }}
+          path: reports/batyastore-causal-v2/
+          if-no-files-found: error
+          retention-days: 14

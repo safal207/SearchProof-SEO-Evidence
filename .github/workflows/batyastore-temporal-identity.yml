@@ -1,0 +1,161 @@
+name: BatyaStore Temporal + Identity Audit
+
+on:
+  push:
+    branches:
+      - audit/batyastore-full-audit-v2
+    paths:
+      - .github/workflows/batyastore-temporal-identity.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  temporal-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Trace taxonomy transitions and duplicate identities
+        run: |
+          mkdir -p reports/batyastore-temporal
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+
+          const O='https://batyastore.ru';
+          const OLD='/catalog/tovary-dlya-doma/novogodnie-tovary/';
+          const NEW='/catalog/tovary-dlya-doma/interer/';
+          const slugs=[
+            'figurka_santa_na_sanyakh_50_sm_winter_collage_villeroy_boch',
+            'muzykalnaya_shkatulka_hutschenreuther_lisenok_v_sapoge',
+            'muzykalnaya_shkatulka_hutschenreuther_melodii_rozhdestva_12kh9sm',
+            'muzykalnaya_shkatulka_s_podsvetkoy_villeroy_boch_christmas_toys_memory_17_x_22_sm_1483276692',
+            'villeroy_boch_3_podveski_lesnye_zverki',
+            'villeroy_boch_annual_christmas_edition_tarelka_24_sm',
+            'villeroy_boch_christmas_classics_ukrashenie_zvezda_10_sm',
+            'villeroy_boch_christmas_toys_muzykalnaya_shkatulka_shchelkunchik_15_sm',
+            'villeroy_boch_christmas_toys_podsvechnik_elka_23_x_17_x_17_cm',
+            'villeroy_boch_christmas_toys_rozhdestvenskaya_elka',
+            'villeroy_boch_christmas_toys_snezhnyy_shar_s_medvezhonkom_9_sm',
+            'villeroy_boch_christmas_toys_vrashchayushchayasya_novogodnyaya_elka_9_kh_17_sm',
+            'villeroy_boch_nostalgicheskie_ukrasheniya_3_podveski_ledentsy_7_5_sm',
+            'villeroy_boch_toy_s_deligh_3_podveski_novogodney_posudy_6_sm',
+            'villeroy_boch_toys_delight_muzykalnaya_shkatulka_elka_33_sm',
+            'villeroy_boch_winter_glow_snezhnyy_shar',
+            'wedgwood_christmas_decoration_novogodniy_kulon_ukrashenie_8_6_kh_6_7_sm_sosnovaya_shishka'
+          ];
+          const pairs=slugs.map(slug=>({slug,old:`${O}${OLD}${slug}/`,expected:`${O}${NEW}${slug}/`}));
+          const dupSets=[
+            [
+              `${O}/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/besprovodnoy-pylesos-dyson-v12-detect-slim-absolute/`,
+              `${O}/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/besprovodnoy-pylesos-dyson-v12-detect-slim-absolute_102845/`
+            ],
+            [
+              `${O}/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/besprovodnoy-pylesos-dyson-v8-total-clean/`,
+              `${O}/catalog/bytovaya-tekhnika/pylesosy/vertikalnye-pylesosy/besprovodnoy-pylesos-dyson-v8-total-clean_102879/`
+            ]
+          ];
+          const observedAt=new Date().toISOString();
+          const norm=u=>{const x=new URL(u,O);x.hash='';return x.toString().replace(/\/$/,'')};
+          const same=(a,b)=>norm(a)===norm(b);
+          const text=(html,re)=>(html.match(re)?.[1]||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+          const canonical=html=>{
+            const a=html.match(/<link[^>]+rel=["'][^"']*canonical[^"']*["'][^>]+href=["']([^"']+)["']/i)?.[1]
+              ||html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*canonical[^"']*["']/i)?.[1]||'';
+            return a?new URL(a,O).toString():'';
+          };
+          const hash=s=>crypto.createHash('sha256').update(s||'').digest('hex');
+          async function trace(url){
+            const chain=[];let cur=url;let body='';let headers={};let status='';
+            for(let i=0;i<6;i++){
+              const ac=new AbortController();const tm=setTimeout(()=>ac.abort(),15000);
+              try{
+                const r=await fetch(cur,{redirect:'manual',headers:{'user-agent':'SearchProof-Evidence/0.3 temporal-audit'},signal:ac.signal});
+                status=r.status;headers=Object.fromEntries(r.headers.entries());
+                const loc=r.headers.get('location');
+                chain.push({url:cur,status:r.status,location:loc?new URL(loc,cur).toString():null});
+                if(r.status>=300&&r.status<400&&loc){cur=new URL(loc,cur).toString();continue;}
+                body=await r.text();break;
+              }catch(e){status='error';chain.push({url:cur,status:'error',error:String(e)});break}
+              finally{clearTimeout(tm)}
+            }
+            return {requested:url,finalUrl:cur,status,chain,body,headers,title:text(body,/<title[^>]*>([\s\S]*?)<\/title>/i),h1:text(body,/<h1[^>]*>([\s\S]*?)<\/h1>/i),canonical:canonical(body),htmlSha256:hash(body)};
+          }
+          function productsFromJsonLd(html){
+            const out=[];
+            for(const m of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)){
+              try{
+                const root=JSON.parse(m[1].trim());
+                const walk=x=>{
+                  if(!x||typeof x!=='object')return;
+                  if(Array.isArray(x)){x.forEach(walk);return;}
+                  if(x['@type']==='Product'||(Array.isArray(x['@type'])&&x['@type'].includes('Product'))){
+                    out.push({name:x.name||'',sku:x.sku||'',mpn:x.mpn||'',gtin:x.gtin||x.gtin13||x.gtin12||x.gtin14||'',brand:typeof x.brand==='string'?x.brand:(x.brand?.name||''),offersUrl:x.offers?.url||''});
+                  }
+                  Object.values(x).forEach(walk);
+                };walk(root);
+              }catch{}
+            }
+            return out;
+          }
+
+          const migration=[];
+          for(const p of pairs){
+            const r=await trace(p.old);
+            let state='other';
+            if(same(r.finalUrl,p.expected)&&r.status===200) state='exact_redirect_to_new';
+            else if(r.status===404) state='404';
+            else if(r.status===410) state='410';
+            else if(r.status===200&&same(r.finalUrl,p.old)) state='old_url_still_200';
+            else if(r.status===200&&r.finalUrl.includes('/interer/')) state='redirect_to_other_interer';
+            else if(r.status===200) state='redirect_to_other_200';
+            migration.push({...p,state,status:r.status,finalUrl:r.finalUrl,canonical:r.canonical,title:r.title,h1:r.h1,chain:r.chain});
+          }
+          const oldCategory=await trace(`${O}${OLD}`);
+          const newCategory=await trace(`${O}${NEW}`);
+
+          const identity=[];
+          for(const set of dupSets){
+            const rows=[];
+            for(const url of set){
+              const r=await trace(url);
+              rows.push({url,status:r.status,finalUrl:r.finalUrl,canonical:r.canonical,title:r.title,h1:r.h1,products:productsFromJsonLd(r.body),htmlSha256:r.htmlSha256});
+            }
+            const a=rows[0],b=rows[1];
+            const sameTitle=a.title===b.title&&!!a.title;
+            const sameH1=a.h1===b.h1&&!!a.h1;
+            const ids=x=>new Set((x.products||[]).flatMap(p=>[p.sku,p.mpn,p.gtin].filter(Boolean)));
+            const ai=ids(a),bi=ids(b);const sharedIds=[...ai].filter(x=>bi.has(x));
+            identity.push({rows,sameTitle,sameH1,sharedStructuredProductIds:sharedIds,bothSelfCanonical:rows.every(x=>x.canonical&&same(x.canonical,x.url)),identityCollision:sameTitle&&sameH1&&rows.every(x=>x.status===200)});
+          }
+
+          const migrationCounts={};for(const x of migration)migrationCounts[x.state]=(migrationCounts[x.state]||0)+1;
+          const report={observedAt,model:'state(t1) → transition → state(t2) + identity collision',migration:{oldCategory:{status:oldCategory.status,finalUrl:oldCategory.finalUrl,canonical:oldCategory.canonical,chain:oldCategory.chain},newCategory:{status:newCategory.status,finalUrl:newCategory.finalUrl,canonical:newCategory.canonical},counts:migrationCounts,rows:migration},identity,integrity:[
+            'The previous and current sitemap counts come from separate SearchProof GitHub Actions artifacts; this workflow validates current redirect/identity behavior.',
+            'Same title/H1 across self-canonical 200 pages is an identity-collision signal, not by itself proof of duplicate-body content.',
+            'Structured Product IDs are reported when parseable JSON-LD is present.'
+          ]};
+          fs.writeFileSync('reports/batyastore-temporal/report.json',JSON.stringify(report,null,2));
+
+          const md=['# BatyaStore temporal + identity audit','',`Observed: ${observedAt}`,'','## Taxonomy migration','',`Old sitemap snapshot: 36,310 URLs; fresh snapshot: 36,309 URLs. Diff observed externally from the two SearchProof artifacts: 18 removed / 17 added, with 17 matching slugs moving from novogodnie-tovary → interer.`,'','| current transition | URLs |','|---|---:|',...Object.entries(migrationCounts).map(([k,v])=>`| ${k} | ${v} |`),'',`Old category now: ${oldCategory.status} → ${oldCategory.finalUrl}`,`New category: ${newCategory.status} → ${newCategory.finalUrl}`,'','## Product identity collisions',''];
+          identity.forEach((x,i)=>{md.push(`### Pair ${i+1}`,`- same title: ${x.sameTitle}`,`- same H1: ${x.sameH1}`,`- both self-canonical: ${x.bothSelfCanonical}`,`- identity collision signal: ${x.identityCollision}`,`- shared structured product IDs: ${x.sharedStructuredProductIds.join(', ')||'none parsed'}`,'',...x.rows.map(r=>`- ${r.url} | ${r.status} | canonical=${r.canonical} | structured=${JSON.stringify(r.products)}`),'');});
+          md.push('## Integrity','',...report.integrity.map(x=>`- ${x}`));
+          const summary=md.join('\n');fs.writeFileSync('reports/batyastore-temporal/summary.md',summary);fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,summary+'\n');console.log(summary);
+          NODE
+
+      - name: Upload temporal evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: batyastore-temporal-identity-${{ github.run_id }}
+          path: reports/batyastore-temporal/
+          if-no-files-found: error
+          retention-days: 14
