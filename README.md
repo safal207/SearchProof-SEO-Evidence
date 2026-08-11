@@ -39,6 +39,29 @@ npm run crawl -- https://example.com --max-pages=50 --max-depth=3
 
 The crawler is bounded, same-origin and evidence-first. It records exact internal-link edges, observed HTTP status, duplicate clusters, canonical mismatches and sitemap-vs-crawl gaps.
 
+### Run SearchProof from GitHub — no local setup
+
+Open the repository in GitHub and use:
+
+`Actions → SearchProof Remote Audit → Run workflow`
+
+Inputs:
+
+- `target_url` — public `http(s)` page or site;
+- `mode` — `page` for one-page audit or `site` for a bounded crawl;
+- `max_pages` — site mode only, `1..200`;
+- `max_depth` — site mode only, `0..6`.
+
+The workflow:
+
+1. validates that the target is a public web URL;
+2. rejects localhost, private, loopback and link-local targets;
+3. runs the same SearchProof Node audit/crawler used locally;
+4. renders the main evidence into the GitHub Actions **Job summary**;
+5. uploads the complete JSON report plus `github-summary.md` as a 14-day workflow artifact.
+
+This makes a SearchProof audit independently reproducible from the GitHub UI without cloning the project or installing Node locally.
+
 ### Import Yandex Webmaster observations
 
 ```bash
@@ -175,6 +198,7 @@ The deterministic suite covers:
 - experiment lifecycle;
 - non-causal before/after comparison;
 - Yandex API URL construction and metric normalization;
+- public-target safety rules for GitHub remote audits;
 - public dashboard integrity.
 
 Live network work stays outside deterministic CI unless explicitly triggered.
@@ -206,6 +230,19 @@ Live network work stays outside deterministic CI unless explicitly triggered.
 - [x] before/after observational comparison
 - [x] recruiter-facing experiment dashboard
 - [x] provider-token non-persistence rule
+
+### v0.3.1 — Bilingual mobile dashboard
+- [x] RU / EN public dashboard
+- [x] persistent language preference
+- [x] mobile-first Experiment Board
+- [x] responsive touch and safe-area improvements
+
+### v0.3.2 — GitHub Remote Audit
+- [x] manual `workflow_dispatch` URL input
+- [x] page / site mode
+- [x] public-target safety validation
+- [x] GitHub Job summary
+- [x] downloadable JSON evidence artifact
 
 ### v0.4 — AI Search
 - [ ] entity coverage across the site graph
