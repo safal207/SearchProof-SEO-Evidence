@@ -10,8 +10,8 @@ const pages = new Map([
     body: `<?xml version="1.0"?><urlset>
       <url><loc>${origin}/</loc></url>
       <url><loc>${origin}/a</loc></url>
-      <url><loc>${origin}/b</loc></url>
-      <url><loc>${origin}/c</loc></url>
+      <url><loc>${origin}/orphan-b</loc></url>
+      <url><loc>${origin}/orphan-c</loc></url>
     </urlset>`
   }],
   [`${origin}/`, {
@@ -20,11 +20,11 @@ const pages = new Map([
     body: `<!doctype html><html><head>
       <title>Home</title><meta name="description" content="Home">
       <link rel="canonical" href="${origin}/">
-    </head><body><h1>Home</h1><a href="/a">A</a><a href="/b">B</a><a href="/c">C</a></body></html>`
+    </head><body><h1>Home</h1><a href="/a">A</a></body></html>`
   }],
   [`${origin}/a`, { status: 200, type: 'text/html', body: '<html><head><title>A</title></head><body><h1>A</h1></body></html>' }],
-  [`${origin}/b`, { status: 200, type: 'text/html', body: '<html><head><title>B</title></head><body><h1>B</h1></body></html>' }],
-  [`${origin}/c`, { status: 200, type: 'text/html', body: '<html><head><title>C</title></head><body><h1>C</h1></body></html>' }]
+  [`${origin}/orphan-b`, { status: 200, type: 'text/html', body: '<html><head><title>B</title></head><body><h1>B</h1></body></html>' }],
+  [`${origin}/orphan-c`, { status: 200, type: 'text/html', body: '<html><head><title>C</title></head><body><h1>C</h1></body></html>' }]
 ]);
 
 function mockFetch(url) {
@@ -43,7 +43,7 @@ test('does not classify undiscovered sitemap URLs as orphan-like when crawl hits
 
   assert.equal(report.summary.crawlTruncated, true);
   assert.equal(report.summary.orphanLikeUrls, 0);
-  assert.equal(report.summary.sitemapUrlsUndiscoveredWithinCrawl, 3);
+  assert.equal(report.summary.sitemapUrlsUndiscoveredWithinCrawl, 2);
   assert.equal(report.findings.some((finding) => finding.id === 'sitemap-orphan-like'), false);
   assert.equal(report.findings.some((finding) => finding.id === 'sitemap-coverage-partial'), true);
 });
