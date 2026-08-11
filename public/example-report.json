@@ -1,0 +1,69 @@
+{
+  "meta": {
+    "kind": "fixture",
+    "note": "Deterministic demonstration data. This file does not represent measured rankings, traffic or AI citations."
+  },
+  "audit": {
+    "finalUrl": "https://example.test/coffee",
+    "httpStatus": 200
+  },
+  "scores": {
+    "overall": 91,
+    "technical": 100,
+    "content": 88,
+    "yandex": 100,
+    "aeo_geo": 75
+  },
+  "findings": [
+    {
+      "id": "canonical",
+      "category": "technical",
+      "status": "pass",
+      "severity": "pass",
+      "message": "Page declares a canonical URL",
+      "evidence": "https://example.test/coffee",
+      "recommendation": "",
+      "metric": "canonical / duplicate URL state"
+    },
+    {
+      "id": "internal-links",
+      "category": "yandex",
+      "status": "pass",
+      "severity": "pass",
+      "message": "Page contains crawlable same-origin links",
+      "evidence": "2 internal / 0 external links",
+      "recommendation": "",
+      "metric": "crawl discovery / internal link graph"
+    },
+    {
+      "id": "structured-data",
+      "category": "aeo_geo",
+      "status": "pass",
+      "severity": "pass",
+      "message": "Page exposes JSON-LD structured data",
+      "evidence": "Detected types: CafeOrCoffeeShop, FAQPage, PostalAddress",
+      "recommendation": "",
+      "metric": "machine-readable entity coverage"
+    },
+    {
+      "id": "title-length",
+      "category": "content",
+      "status": "warn",
+      "severity": "warn",
+      "message": "Title length needs editorial review",
+      "evidence": "74 characters in this demonstration finding",
+      "recommendation": "Review clarity and truncation risk; title length is an editorial heuristic, not a ranking rule.",
+      "metric": "snippet presentation / CTR observation"
+    },
+    {
+      "id": "answer-structure",
+      "category": "aeo_geo",
+      "status": "warn",
+      "severity": "warn",
+      "message": "Answer structure can be made more explicit",
+      "evidence": "FAQ schema exists, but only one concise visible answer block is represented in this demo.",
+      "recommendation": "Add genuinely useful visible answers for recurring user questions and keep markup aligned with visible content.",
+      "metric": "answer extraction / AI citation observation"
+    }
+  ]
+}

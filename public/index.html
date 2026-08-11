@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SearchProof turns SEO, Yandex readiness and AEO/GEO findings into evidence-backed optimization hypotheses.">
+  <meta name="robots" content="index,follow">
+  <title>SearchProof — SEO Evidence</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="SearchProof home">
+      <span class="brand-mark">SP</span>
+      <span>SearchProof</span>
+    </a>
+    <a class="github-link" href="https://github.com/safal207/SearchProof-SEO-Evidence">GitHub ↗</a>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <p class="eyebrow">SEO · YANDEX · AEO · GEO</p>
+      <h1>SEO recommendations are cheap.<br><em>Evidence is the product.</em></h1>
+      <p class="hero-copy">SearchProof converts a page audit into a chain you can verify: URL → finding → evidence → change → metric → observed result.</p>
+      <div class="audit-form" aria-label="Audit command preview">
+        <label for="url">Target URL</label>
+        <div class="input-row">
+          <input id="url" type="url" value="https://safal207.github.io/robys-coffee-house-demo/" aria-describedby="url-help">
+          <button id="command-button" type="button">Copy audit command</button>
+        </div>
+        <p id="url-help">MVP audits URLs from the Node CLI. The browser dashboard visualizes evidence reports without pretending that client-side CORS can crawl the web.</p>
+        <code id="command">npm run audit -- https://safal207.github.io/robys-coffee-house-demo/</code>
+      </div>
+    </section>
+
+    <section class="dashboard" aria-labelledby="dashboard-title">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">DEMO REPORT</p>
+          <h2 id="dashboard-title">Evidence dashboard</h2>
+        </div>
+        <span class="truth-badge">Fixture data · no ranking claims</span>
+      </div>
+
+      <div class="score-grid" id="scores" aria-label="Audit scores"></div>
+
+      <div class="two-column">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Prioritized findings</h3>
+            <span id="finding-count"></span>
+          </div>
+          <div id="findings" class="finding-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><h3>Hypothesis contract</h3></div>
+          <div class="flow" aria-label="Optimization evidence flow">
+            <span>Finding</span><b>→</b><span>Evidence</span><b>→</b><span>Change</span><b>→</b><span>Metric</span><b>→</b><span>Verification</span>
+          </div>
+          <dl class="contract">
+            <div><dt>Baseline</dt><dd>What is observed before the change?</dd></div>
+            <div><dt>Change</dt><dd>What exact implementation was made?</dd></div>
+            <div><dt>Metric</dt><dd>What should move if the hypothesis is useful?</dd></div>
+            <div><dt>Window</dt><dd>When is it reasonable to re-check?</dd></div>
+            <div><dt>Result</dt><dd>Observed value only — never invented uplift.</dd></div>
+          </dl>
+        </section>
+      </div>
+    </section>
+
+    <section class="principles">
+      <p class="eyebrow">PRODUCT RULES</p>
+      <h2>Built like a QA system for search.</h2>
+      <div class="principle-grid">
+        <article><strong>01</strong><h3>Observed ≠ inferred</h3><p>HTML evidence, crawler responses and measured search data stay separate from recommendations.</p></article>
+        <article><strong>02</strong><h3>Scores are heuristics</h3><p>SearchProof never presents its prioritization score as a score from Yandex, Google or an AI provider.</p></article>
+        <article><strong>03</strong><h3>Every fix gets a metric</h3><p>A recommendation without a verification path is incomplete.</p></article>
+        <article><strong>04</strong><h3>AI Search without magic</h3><p>AEO/GEO checks focus on entities and answer structures, not guaranteed citations.</p></article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>SearchProof v0.1 · Evidence-first technical SEO by <a href="https://github.com/safal207">Aleksey Safonov</a>.</p>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

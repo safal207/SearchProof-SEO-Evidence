@@ -1,0 +1,16 @@
+{
+  "name": "searchproof-seo-evidence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Evidence-first SEO, Yandex readiness and AEO/GEO audit MVP",
+  "scripts": {
+    "audit": "node src/audit.mjs",
+    "test": "node --test",
+    "verify": "npm test && node scripts/verify-public.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

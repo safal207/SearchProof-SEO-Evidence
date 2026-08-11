@@ -1,0 +1,54 @@
+name: SearchProof CI
+
+on:
+  push:
+    branches: [main, mvp-evidence-audit]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify deterministic audit engine and dashboard contracts
+        run: npm run verify
+
+  live-example:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run live public-case audit
+        run: npm run audit -- https://safal207.github.io/robys-coffee-house-demo/
+
+      - name: Upload evidence report
+        uses: actions/upload-artifact@v4
+        with:
+          name: robys-searchproof-evidence
+          path: reports/*.json
+          if-no-files-found: error
+          retention-days: 14
