@@ -42,6 +42,41 @@ export function normalizeUrl(input, base) {
   }
 }
 
+function stripConventionalIndex(input) {
+  const normalized = normalizeUrl(input);
+  if (!normalized) return null;
+  const url = new URL(normalized);
+  if (/\/index\.html?$/i.test(url.pathname)) {
+    url.pathname = url.pathname.replace(/index\.html?$/i, '');
+  }
+  return url.href;
+}
+
+function isCanonicalIndexAlias(page) {
+  if (!page?.canonical || !page?.url) return false;
+  const pageUrl = normalizeUrl(page.url);
+  const canonical = normalizeUrl(page.canonical, page.url);
+  if (!pageUrl || !canonical) return false;
+  if (new URL(pageUrl).origin !== new URL(canonical).origin) return false;
+  return stripConventionalIndex(pageUrl) === stripConventionalIndex(canonical);
+}
+
+function logicalPageUrl(page) {
+  if (isCanonicalIndexAlias(page)) return stripConventionalIndex(page.canonical);
+  return normalizeUrl(page?.url) || page?.url || '';
+}
+
+function collapseCanonicalAliases(pages) {
+  const byDocument = new Map();
+  for (const page of pages) {
+    const key = logicalPageUrl(page);
+    if (!key) continue;
+    const current = byDocument.get(key);
+    if (!current || page.url === key) byDocument.set(key, page);
+  }
+  return [...byDocument.values()];
+}
+
 export function extractPageSignals(html, pageUrl) {
   const base = new URL(pageUrl);
   const links = [];
@@ -82,12 +117,12 @@ function duplicateGroups(pages, field, transform = (value) => compact(value).toL
     const key = value ? transform(value) : '';
     if (!key) continue;
     const list = buckets.get(key) || [];
-    list.push(page.url);
+    list.push(logicalPageUrl(page));
     buckets.set(key, list);
   }
   return [...buckets.entries()]
-    .filter(([, urls]) => urls.length > 1)
-    .map(([value, urls]) => ({ value, urls }));
+    .filter(([, urls]) => new Set(urls).size > 1)
+    .map(([value, urls]) => ({ value, urls: [...new Set(urls)] }));
 }
 
 function finding({ id, severity, message, evidence, recommendation, metric, affectedUrls = [] }) {
@@ -193,16 +228,23 @@ export async function crawlSite({
     pageByUrl.set(page.url, page);
   }
 
-  const htmlPages = pages.filter((page) => page.isHtml && page.status >= 200 && page.status < 400);
-  const crawledUrls = new Set(htmlPages.map((page) => page.url));
-  const discoveredUrls = new Set([seed, ...uniqueEdges.map((edge) => edge.to)]);
-  const missingTitle = htmlPages.filter((page) => !page.title).map((page) => page.url);
-  const missingH1 = htmlPages.filter((page) => page.h1s.length === 0).map((page) => page.url);
+  const physicalHtmlPages = pages.filter((page) => page.isHtml && page.status >= 200 && page.status < 400);
+  const htmlPages = collapseCanonicalAliases(physicalHtmlPages);
+  const crawledUrls = new Set(htmlPages.map((page) => logicalPageUrl(page)));
+  const discoveredUrls = new Set([
+    logicalPageUrl({ url: seed, canonical: '' }),
+    ...uniqueEdges.map((edge) => {
+      const targetPage = pageByUrl.get(edge.to);
+      return targetPage ? logicalPageUrl(targetPage) : edge.to;
+    })
+  ]);
+  const missingTitle = htmlPages.filter((page) => !page.title).map((page) => logicalPageUrl(page));
+  const missingH1 = htmlPages.filter((page) => page.h1s.length === 0).map((page) => logicalPageUrl(page));
   const duplicateTitles = duplicateGroups(htmlPages, 'title');
   const duplicateDescriptions = duplicateGroups(htmlPages, 'description');
   const duplicateH1s = duplicateGroups(htmlPages, 'h1s');
-  const canonicalMismatches = htmlPages
-    .filter((page) => page.canonical && page.canonical !== page.url)
+  const canonicalMismatches = physicalHtmlPages
+    .filter((page) => page.canonical && page.canonical !== page.url && !isCanonicalIndexAlias(page))
     .map((page) => ({ url: page.url, canonical: page.canonical }));
 
   const brokenInternalLinks = [];
@@ -242,10 +284,10 @@ export async function crawlSite({
     },
     sitemap: { url: sitemapUrl, status: sitemap.status, urls: sitemapUrls, orphanLike, crawledMissingFromSitemap },
     pages,
-    graph: { nodes: pages.map((page) => ({ url: page.url, status: page.status, depth: page.depth, title: page.title })), edges: uniqueEdges },
+    graph: { nodes: pages.map((page) => ({ url: page.url, status: page.status, depth: page.depth, title: page.title, logicalUrl: logicalPageUrl(page) })), edges: uniqueEdges },
     duplicates: { titles: duplicateTitles, descriptions: duplicateDescriptions, h1s: duplicateH1s },
-    brokenInternalLinks,
     canonicalMismatches,
+    brokenInternalLinks,
     findings,
     hypothesisTemplate: { finding: '', evidence: '', change: '', baseline: '', targetMetric: '', verificationWindow: '', observedResult: '' }
   };
