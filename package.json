@@ -1,12 +1,13 @@
 {
   "name": "searchproof-seo-evidence",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Evidence-first SEO, Yandex readiness and AEO/GEO audit MVP",
+  "description": "Evidence-first SEO, Yandex readiness and AEO/GEO audit product",
   "scripts": {
     "audit": "node src/audit.mjs",
     "crawl": "node src/crawl.mjs",
+    "yandex:observe": "node src/yandex-observe.mjs",
     "test": "node --test",
     "verify": "npm test && node scripts/verify-public.mjs",
     "serve": "node scripts/serve.mjs"

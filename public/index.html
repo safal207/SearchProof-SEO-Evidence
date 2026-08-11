@@ -3,17 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="SearchProof turns SEO, Yandex readiness and AEO/GEO findings into evidence-backed optimization hypotheses.">
+  <meta name="description" content="SearchProof turns SEO, Yandex readiness and AEO/GEO findings into evidence-backed optimization experiments.">
   <meta name="robots" content="index,follow">
   <title>SearchProof — SEO Evidence</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="experiment.css">
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="#top" aria-label="SearchProof home">
-      <span class="brand-mark">SP</span>
-      <span>SearchProof</span>
-    </a>
+    <a class="brand" href="#top" aria-label="SearchProof home"><span class="brand-mark">SP</span><span>SearchProof</span></a>
     <a class="github-link" href="https://github.com/safal207/SearchProof-SEO-Evidence">GitHub ↗</a>
   </header>
 
@@ -28,36 +26,25 @@
           <input id="url" type="url" value="https://safal207.github.io/robys-coffee-house-demo/" aria-describedby="url-help">
           <button id="command-button" type="button">Copy site crawl command</button>
         </div>
-        <p id="url-help">v0.2 crawls a bounded same-origin graph from Node. Use <code>npm run audit -- URL</code> for the detailed single-page SEO / AEO report.</p>
+        <p id="url-help">v0.3 combines bounded same-origin crawl evidence with a search experiment lifecycle. Use <code>npm run audit -- URL</code> for a detailed single-page report.</p>
         <code id="command">npm run crawl -- https://safal207.github.io/robys-coffee-house-demo/ --max-pages=50 --max-depth=3</code>
       </div>
     </section>
 
     <section class="dashboard" aria-labelledby="dashboard-title">
       <div class="section-head">
-        <div>
-          <p class="eyebrow">DEMO PAGE REPORT</p>
-          <h2 id="dashboard-title">Evidence dashboard</h2>
-        </div>
+        <div><p class="eyebrow">DEMO PAGE REPORT</p><h2 id="dashboard-title">Evidence dashboard</h2></div>
         <span class="truth-badge">Fixture data · no ranking claims</span>
       </div>
-
       <div class="score-grid" id="scores" aria-label="Audit scores"></div>
-
       <div class="two-column">
         <section class="panel">
-          <div class="panel-head">
-            <h3>Prioritized findings</h3>
-            <span id="finding-count"></span>
-          </div>
+          <div class="panel-head"><h3>Prioritized findings</h3><span id="finding-count"></span></div>
           <div id="findings" class="finding-list"></div>
         </section>
-
         <section class="panel">
           <div class="panel-head"><h3>Hypothesis contract</h3></div>
-          <div class="flow" aria-label="Optimization evidence flow">
-            <span>Finding</span><b>→</b><span>Evidence</span><b>→</b><span>Change</span><b>→</b><span>Metric</span><b>→</b><span>Verification</span>
-          </div>
+          <div class="flow" aria-label="Optimization evidence flow"><span>Finding</span><b>→</b><span>Evidence</span><b>→</b><span>Change</span><b>→</b><span>Metric</span><b>→</b><span>Verification</span></div>
           <dl class="contract">
             <div><dt>Baseline</dt><dd>What is observed before the change?</dd></div>
             <div><dt>Change</dt><dd>What exact implementation was made?</dd></div>
@@ -66,6 +53,18 @@
             <div><dt>Result</dt><dd>Observed value only — never invented uplift.</dd></div>
           </dl>
         </section>
+      </div>
+    </section>
+
+    <section class="experiment-section" aria-labelledby="experiment-title">
+      <div class="section-head">
+        <div><p class="eyebrow">EXPERIMENT BOARD · v0.3</p><h2 id="experiment-title">From SEO change to measured observation.</h2></div>
+        <span class="truth-badge">Observed delta ≠ causal attribution</span>
+      </div>
+      <div id="experiment-board" class="experiment-board"></div>
+      <div class="provider-panel">
+        <div><strong>Yandex Webmaster observation</strong><p>SearchProof can import TOTAL_SHOWS, TOTAL_CLICKS, AVG_SHOW_POSITION and AVG_CLICK_POSITION from the official Webmaster API and store them as provider evidence.</p></div>
+        <code>YANDEX_TOKEN=… YANDEX_USER_ID=… YANDEX_HOST_ID=… npm run yandex:observe -- --date-from=YYYY-MM-DD --date-to=YYYY-MM-DD</code>
       </div>
     </section>
 
@@ -92,10 +91,7 @@
     </section>
   </main>
 
-  <footer>
-    <p>SearchProof v0.2 · Evidence-first technical SEO by <a href="https://github.com/safal207">Aleksey Safonov</a>.</p>
-  </footer>
-
+  <footer><p>SearchProof v0.3 · Evidence-first technical SEO by <a href="https://github.com/safal207">Aleksey Safonov</a>.</p></footer>
   <script type="module" src="app.js"></script>
 </body>
 </html>

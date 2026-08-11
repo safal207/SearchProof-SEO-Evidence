@@ -1,68 +1,65 @@
 # SearchProof — SEO Evidence
 
-**SearchProof** is an evidence-first SEO / AEO / GEO audit product.
+**SearchProof** is an evidence-first SEO / AEO / GEO audit and experiment product.
 
-Instead of producing a long checklist of generic recommendations, SearchProof turns each finding into a verifiable optimization hypothesis:
+Instead of producing a generic checklist, SearchProof keeps the verification chain explicit:
 
 `URL → finding → evidence → change → metric → verification`
 
-For site-level work the model becomes:
+For site-level work:
 
 `site → crawl graph → affected URLs → finding → change → metric → re-crawl / provider observation`
 
-The project is designed for technical SEO, Yandex-oriented site quality work, and AI-search readiness (AEO/GEO) without inventing ranking or traffic results.
+For SEO experiments:
+
+`baseline → hypothesis → implementation evidence → verification window → provider observation → observed delta`
+
+**Observed delta is not causal attribution.** SearchProof never turns before/after movement into a guaranteed SEO uplift claim.
 
 ## Why this exists
 
-SEO work is often hard to verify after the fact. Recommendations get mixed with implementation, measurement windows are unclear, and reported uplift can be difficult to attribute.
+SEO work is often difficult to verify after the fact: recommendations get mixed with implementation, measurement windows are unclear, and reported uplift can be hard to attribute.
 
-SearchProof keeps the audit and the evidence together:
+SearchProof keeps the audit, implementation evidence and measurement contract together.
 
-- crawl/indexability checks;
-- title, description, canonical, robots and sitemap checks;
-- heading and content-structure checks;
-- structured-data discovery;
-- same-origin site crawl and internal-link graph;
-- broken internal-link evidence;
-- duplicate title, H1 and description groups;
-- sitemap-vs-crawl discovery gaps;
-- canonical mismatch evidence;
-- local-business / entity signals;
-- AEO/GEO heuristics for answerable, citeable content;
-- an evidence record for every finding;
-- a hypothesis board for `baseline → change → observed result`.
+## Quick start
 
-## MVP
-
-### 1. Audit one URL
+### Audit one URL
 
 ```bash
 npm install
 npm run audit -- https://example.com/page
 ```
 
-This produces the single-page SEO / Yandex / AEO-GEO evidence report.
-
-### 2. Crawl a site
+### Crawl a site
 
 ```bash
 npm run crawl -- https://example.com --max-pages=50 --max-depth=3
 ```
 
-The crawler:
+The crawler is bounded, same-origin and evidence-first. It records exact internal-link edges, observed HTTP status, duplicate clusters, canonical mismatches and sitemap-vs-crawl gaps.
 
-- follows only `http(s)` same-origin links;
-- removes URL fragments before graph comparison;
-- uses a bounded BFS queue;
-- records page HTTP status, title, description, H1 and canonical;
-- builds a deduplicated internal-link graph;
-- compares crawl discovery with the conventional `/sitemap.xml`;
-- reports only broken links whose target response was actually fetched;
-- labels sitemap-only URLs as **orphan-like**, not proven orphans.
+### Import Yandex Webmaster observations
 
-Both CLIs write timestamped JSON reports into `reports/`.
+```bash
+YANDEX_TOKEN=... \
+YANDEX_USER_ID=... \
+YANDEX_HOST_ID=... \
+npm run yandex:observe -- --date-from=2026-08-01 --date-to=2026-08-07
+```
 
-### 3. Open the dashboard
+The token is sent only in the `Authorization` header and is never persisted in generated observation JSON.
+
+Current provider metrics:
+
+- `TOTAL_SHOWS`
+- `TOTAL_CLICKS`
+- `AVG_SHOW_POSITION`
+- `AVG_CLICK_POSITION`
+
+See [`docs/YANDEX_WEBMASTER.md`](docs/YANDEX_WEBMASTER.md) for endpoint and transformation details.
+
+### Open the dashboard
 
 ```bash
 npm run serve
@@ -70,98 +67,95 @@ npm run serve
 
 Then open `http://localhost:8080`.
 
-The browser dashboard is deliberately a report viewer / product surface. The actual web crawl runs from Node so the UI does not pretend browser CORS can crawl arbitrary sites.
+The browser is a report and experiment surface. Crawling and provider imports run from Node rather than pretending browser CORS can crawl or authenticate arbitrary external systems.
+
+## Experiment model
+
+SearchProof v0.3 adds a small lifecycle model:
+
+- `planned` — hypothesis exists but the implementation is not recorded;
+- `implemented` — an exact change and optional PR/evidence URL are recorded;
+- `measuring` — provider observations are being collected;
+- `observed` — the verification window has produced reviewable observations;
+- `closed` — the experiment is complete or intentionally stopped.
+
+Every experiment can keep:
+
+```text
+id
+targetUrl
+hypothesis
+baseline
+change.description
+change.appliedAt
+change.evidenceUrl
+verification.metrics
+verification.windowDays
+observations[]
+integrity.causalClaim = false
+```
+
+`compareObservedMetric()` returns a numeric delta only when both baseline and an observation exist. Its interpretation is explicitly `observed-delta-not-causal-attribution`.
 
 ## Site crawl evidence
 
 Current site-level findings include:
 
-- broken internal links with observed response status;
+- broken internal links whose failing response was actually fetched;
 - missing titles;
 - duplicate title groups;
 - missing H1 pages;
 - duplicate H1 groups;
 - duplicate meta description groups;
 - canonical mismatches (`crawled URL != declared canonical`);
-- sitemap URLs not discovered through the crawled internal-link graph;
+- sitemap URLs not discovered through the bounded crawl graph;
 - crawlable HTML pages missing from the conventional sitemap.
 
-A canonical mismatch is a **review signal**, not automatically an error: alternate canonicals can be intentional. Likewise, a sitemap URL that was not discovered in a bounded crawl is only an orphan-like candidate until broader evidence confirms it.
+A canonical mismatch is a review signal, not automatically an error. A sitemap URL undiscovered by a bounded crawl is only an **orphan-like candidate**, not proof of a true orphan page.
 
-## Score philosophy
+## Page audit evidence
 
-SearchProof page scores are **product heuristics**, not scores published by Yandex, Google, OpenAI or any other search/AI provider. A score is only a compact way to prioritize evidence-backed checks.
+The single-page layer currently checks:
 
-The site crawler intentionally emphasizes counts, affected URLs and graph evidence rather than inventing a search-engine score.
+- HTTP status and redirect endpoint;
+- `<title>` presence and length heuristic;
+- meta description presence;
+- canonical presence and absolute URL;
+- robots meta indexability signal;
+- H1 and heading structure;
+- `lang` and viewport;
+- JSON-LD / entity discovery;
+- Open Graph basics;
+- internal/external links;
+- visible-content heuristic;
+- FAQ / answer signals;
+- LocalBusiness / Organization entity signals;
+- robots.txt and sitemap.xml discovery.
 
-The product never claims that adding a specific tag or schema field will increase rankings. Search engines ultimately decide crawling, indexing and ranking.
+Page scores are **SearchProof product heuristics**, not scores published by Yandex, Google, OpenAI or another provider.
+
+## Yandex evidence contract
+
+The v0.3 adapter uses the official Yandex Webmaster API for search-query observations. SearchProof stores the provider series and a documented transformation rather than presenting the result as an internal Yandex score.
+
+For all-query history:
+
+- shows and clicks are summed over the requested period;
+- average show position is weighted by same-day shows when available;
+- average click position is weighted by same-day clicks when available;
+- original daily series is preserved next to the transformed metrics.
+
+The provider observation tells us **what changed in measured data**. It does not prove **why it changed**.
 
 ## First public case
 
-The first public case is **Roby's Coffee House**, a live multilingual service website:
+The first public applied case is **Roby's Coffee House**:
 
 - Site: https://safal207.github.io/robys-coffee-house-demo/
 - Source: https://github.com/safal207/robys-coffee-house-demo
 - SEO case PR: https://github.com/safal207/robys-coffee-house-demo/pull/327
 
-That case intentionally separates implemented SEO changes from future measurements. Position, impression, CTR and traffic uplift are not claimed until observed.
-
-## Product model
-
-Every finding has:
-
-```text
-id
-category
-severity
-status
-message
-evidence
-recommendation
-metric
-affectedUrls
-```
-
-Example:
-
-```text
-Finding: Broken internal links
-Evidence: 3 internal link edges returned HTTP 404
-Affected URLs: /old-menu, /coffee/cappuccino, /delivery
-Recommendation: Fix the target response or update/remove the link
-Metric: internal link HTTP status after re-crawl
-```
-
-## Current page checks
-
-- HTTP status and redirect endpoint
-- `<title>` presence and length heuristic
-- meta description presence
-- canonical presence and absolute URL
-- robots meta indexability signal
-- H1 count
-- heading outline presence
-- `lang` declaration
-- viewport declaration
-- JSON-LD discovery and schema types
-- Open Graph basics
-- internal/external link counts
-- visible text word-count heuristic
-- FAQ / question-answer signal
-- LocalBusiness / Organization entity signal
-- robots.txt availability
-- sitemap.xml availability
-- sitemap declaration in robots.txt
-
-## Yandex-oriented evidence
-
-SearchProof checks foundational signals that matter for crawl/index work in Yandex, including canonical URLs, crawlable internal links, robots.txt and Sitemap discovery. It does **not** pretend to reproduce Yandex ranking algorithms.
-
-The crawler adds a concrete internal-link graph and sitemap discovery comparison so the recommendation can point to exact affected URLs instead of a generic checklist item.
-
-## AEO / GEO readiness
-
-The current AEO/GEO layer is deliberately conservative. It checks whether a page exposes machine-readable entities and human-readable answer structures such as FAQ/question sections. It does **not** claim guaranteed inclusion or citation by ChatGPT, Gemini, Perplexity or other AI systems.
+The case deliberately separates implemented SEO changes from future measurements. Position, impressions, clicks, CTR and traffic uplift are not claimed until actually observed.
 
 ## Verification
 
@@ -169,16 +163,21 @@ The current AEO/GEO layer is deliberately conservative. It checks whether a page
 npm run verify
 ```
 
-The deterministic test suite includes a synthetic site with intentional:
+The deterministic suite covers:
 
-- 404 internal target;
-- duplicate title/H1/description;
+- page-audit contracts;
+- crawler graph behavior;
+- 404 internal targets;
+- duplicate title/H1/description groups;
 - missing title/H1;
 - alternate canonical;
-- sitemap-only URL;
-- crawled page absent from sitemap.
+- sitemap-only and crawl-only URLs;
+- experiment lifecycle;
+- non-causal before/after comparison;
+- Yandex API URL construction and metric normalization;
+- public dashboard integrity.
 
-This keeps crawler behavior reviewable without depending on live network state.
+Live network work stays outside deterministic CI unless explicitly triggered.
 
 ## Roadmap
 
@@ -201,10 +200,12 @@ This keeps crawler behavior reviewable without depending on live network state.
 - [x] deterministic crawler regression tests
 
 ### v0.3 — Search experiment board
-- [ ] baseline snapshots
-- [ ] hypothesis lifecycle
-- [ ] Yandex Webmaster metric import
-- [ ] before/after comparison
+- [x] baseline snapshots
+- [x] hypothesis lifecycle
+- [x] Yandex Webmaster observation adapter
+- [x] before/after observational comparison
+- [x] recruiter-facing experiment dashboard
+- [x] provider-token non-persistence rule
 
 ### v0.4 — AI Search
 - [ ] entity coverage across the site graph
